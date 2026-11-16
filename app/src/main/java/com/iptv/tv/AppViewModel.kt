@@ -24,6 +24,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -125,6 +126,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var sleepJob: Job? = null
     private var lastFrames = -1
     private var failCount = 0
+    /** Cihaz bu kanalin goruntusunu cozemiyor (orn. tablette 4K HEVC): yeniden deneme yapma. */
+    private var decoderBlocked = false
     private var autoAudioUrl = ""
     private var freshStart = false
     private val epgFetchedAt = HashMap<String, Long>()
@@ -180,7 +183,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // Ilk hatadan sonraki yeniden denemede de yukleniyor simgesi gorunsun
                 buffering = state == Player.STATE_BUFFERING ||
                     (state == Player.STATE_IDLE && failCount == 1 && isLiveActive())
-                if (state != Player.STATE_READY && isLiveActive() && player.playWhenReady) {
+                if (state != Player.STATE_READY && isLiveActive() && player.playWhenReady && !decoderBlocked) {
                     armWatch(if (state == Player.STATE_BUFFERING) 12_000L else 1_500L)
                 }
             }
@@ -191,6 +194,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                if (isVideoDecoderLimit(error)) {
+                    // Yeniden denemek ise yaramaz: cihazin donanimi bu goruntuyu cozemiyor
+                    decoderBlocked = true
+                    watchJob?.cancel()
+                    buffering = false
+                    playerMessage = videoLimitMessage(error)
+                    return
+                }
                 if (screen == Screen.LIVE) {
                     // Canli yayinda bekci (armWatch) 1,5 sn sonra kanali yeniden acar.
                     // Ilk hatada uyari gosterme (cogu sunucu ikinci denemede acar), sadece yukleniyor simgesi.
@@ -461,6 +472,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playerMessage = null
         lastFrames = -1
         failCount = 0
+        decoderBlocked = false
         // Onceki kanalin ses/altyazi secimi yeni kanala tasinmasin (dil tercihi kalir)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
         player.setMediaItem(MediaItem.fromUri(url))
@@ -589,6 +601,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (frames != prev) { armWatch(10_000L); return }
         }
         reloadCurrent()
+    }
+
+    /** Hata, cihazin goruntu cozucusunun bu formati kaldiramamasindan mi? */
+    private fun isVideoDecoderLimit(e: PlaybackException): Boolean {
+        val codes = setOf(
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+            PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
+        )
+        if (e.errorCode !in codes) return false
+        val mime = (e as? ExoPlaybackException)?.rendererFormat?.sampleMimeType ?: return false
+        return mime.startsWith("video/")
+    }
+
+    private fun videoLimitMessage(e: PlaybackException): String {
+        val f = (e as? ExoPlaybackException)?.rendererFormat
+        val res = if (f != null && f.height >= 2000) "4K " else ""
+        val codec = when (f?.sampleMimeType) {
+            "video/hevc" -> "HEVC/H.265"
+            "video/avc" -> "H.264"
+            else -> f?.sampleMimeType?.removePrefix("video/")?.uppercase() ?: ""
+        }
+        return "Bu cihaz bu kanalın ${res}görüntüsünü ($codec) çözemiyor.\nKanalın HD / FHD sürümünü deneyin."
     }
 
     private fun reloadCurrent() {
