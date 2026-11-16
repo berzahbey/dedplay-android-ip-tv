@@ -4,7 +4,9 @@ Android TV, Android telefon/tablet ve Android tabanlı araç multimedya kutular�
 
 Bu uygulama sadece bir **oynatıcıdır**. İçerik, sizin kendi (yasal) M3U listenizden veya Xtream hesabınızdan gelir.
 
-**Son sürüm:** [`apk/dedplay-v1.2.apk`](apk/dedplay-v1.2.apk)
+**Son sürüm:** [⬇️ dedplay.apk indir](https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest/download/dedplay.apk)  ·  [sürüm notları](https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest)
+
+Bu bağlantı her zaman en son sürümü indirir; telefonda, tablette ve araç kutusunda tarayıcıdan açılabilir.
 
 ---
 
@@ -46,7 +48,7 @@ En az **Android 6.0** gerekir.
 
 ### Android TV / Google TV
 **Yol A — USB bellek**
-1. `apk/dedplay-v1.2.apk` dosyasını USB belleğe kopyalayın, TV'ye takın.
+1. [dedplay.apk](https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest/download/dedplay.apk) dosyasını indirip USB belleğe kopyalayın, TV'ye takın.
 2. TV'de bir dosya yöneticisi (örn. "File Commander", "X-plore") ile APK'yı açıp kurun.
 3. İzin isterse: Ayarlar > Güvenlik > **Bilinmeyen kaynaklar** > dosya yöneticisine izin verin.
 
@@ -56,11 +58,11 @@ En az **Android 6.0** gerekir.
 3. Bilgisayarda:
    ```bash
    adb connect TV_IP_ADRESI:5555
-   adb install -r dedplay-v1.2.apk
+   adb install -r dedplay.apk
    ```
 
 ### Android telefon / tablet
-1. Telefonun tarayıcısında bu sayfadan `apk/dedplay-v1.2.apk` dosyasını indirin (**View raw / Download**).
+1. Telefonun tarayıcısında şu bağlantıyı açın, APK iner: https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest/download/dedplay.apk
 2. İndirilen dosyaya dokunun; "Bilinmeyen uygulamaları yükle" izni isterse tarayıcıya izin verin.
 
 ### Araç kutusu (AI box)
