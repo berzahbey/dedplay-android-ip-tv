@@ -21,10 +21,25 @@ android {
         }
     }
 
+    // Kendi surum anahtari: ayarlar ~/.gradle/gradle.properties dosyasinda (proje disinda, GitHub'a gitmez).
+    // Ayarlar yoksa (orn. projeyi baska biri derlerse) debug anahtariyla imzalanir.
+    val releaseStore = (project.findProperty("DEDPLAY_STORE_FILE") as String?)?.let { file(it) }
+    val hasReleaseKey = releaseStore != null && releaseStore.exists()
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = releaseStore
+                storePassword = project.findProperty("DEDPLAY_STORE_PASSWORD") as String?
+                keyAlias = project.findProperty("DEDPLAY_KEY_ALIAS") as String?
+                keyPassword = project.findProperty("DEDPLAY_KEY_PASSWORD") as String?
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TV'deki surumle ayni (debug) anahtar: yeni APK eskisinin ustune kurulur, ayarlar silinmez
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
