@@ -8,11 +8,12 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.iptv.tv"
+        // Uygulamanin Android / Play kimligi (kod paketi namespace olarak com.iptv.tv kalir)
+        applicationId = "nl.dedplay.iptv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
     }
 
     applicationVariants.all {
