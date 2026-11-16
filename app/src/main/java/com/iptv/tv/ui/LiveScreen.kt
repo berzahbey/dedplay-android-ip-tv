@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -153,8 +155,10 @@ fun LiveScreen(vm: AppViewModel) {
     val isTv = rememberIsTv()
     var touchBar by remember { mutableStateOf(false) }
     var lastBack by remember { mutableStateOf(0L) }
-    // Dokunmatik cihazda acilista arac cubugunu goster (Kanallar / Gruplar / Ara ...)
-    LaunchedEffect(Unit) { if (!isTv) touchBar = true }
+    // Dokunmatik cihaz: ekrana dokununca kanal listesi gelir; acilista kisa bir ipucu
+    LaunchedEffect(Unit) { if (!isTv) vm.toast("Kanal listesi için ekrana dokunun") }
+    // Dokunmatik cihaz: liste 5 sn hic dokunulmazsa kendiliginden kapanir
+    var touchTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(touchBar) {
         if (touchBar) { delay(6000); touchBar = false }
     }
@@ -171,10 +175,23 @@ fun LiveScreen(vm: AppViewModel) {
         }
     }
 
+    LaunchedEffect(panel, touchTick, chanIdx, groupIdx, menuIdx) {
+        if (!isTv && (panel == Panel.CHANNELS || panel == Panel.GROUPS || panel == Panel.MENU)) {
+            delay(5000)
+            panel = Panel.NONE
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .pointerInput(Unit) {
+                // Her dokunma / kaydirma (listenin icindekiler dahil) sayaci sifirlar
+                awaitPointerEventScope {
+                    while (true) { awaitPointerEvent(PointerEventPass.Initial); touchTick++ }
+                }
+            }
             .tvKeys(
                 onUp = {
                     when (panel) {
@@ -273,7 +290,9 @@ fun LiveScreen(vm: AppViewModel) {
             )
             .touchGestures(
                 onTap = {
-                    if (panel != Panel.NONE) panel = Panel.NONE else touchBar = !touchBar
+                    if (panel != Panel.NONE) panel = Panel.NONE
+                    else if (isTv) touchBar = !touchBar
+                    else openChannels()
                 },
                 onLongPress = { if (panel == Panel.NONE) openOptions() },
                 onSwipeUp = { if (panel == Panel.NONE) vm.zap(1) },
@@ -399,9 +418,17 @@ fun LiveScreen(vm: AppViewModel) {
             }
             Panel.CHANNELS -> SidePanel(620) {
                 if (isTv) PanelHeader(vm.liveGroup.uppercase())
-                else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TvButton("◀ Gruplar") { openGroups() }
-                    TvButton("Ara") { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
+                else {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()).padding(bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TvButton("◀ Gruplar") { openGroups() }
+                        TvButton("Ara") { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
+                        TvButton("Menü") { menuIdx = 0; panel = Panel.MENU }
+                        TvButton("Seçenekler") { openOptions() }
+                    }
                     PanelHeader(vm.liveGroup.uppercase())
                 }
                 val rows = channels.mapIndexed { i, c ->
@@ -426,7 +453,7 @@ fun LiveScreen(vm: AppViewModel) {
                 channels.getOrNull(cSel)?.let { sel ->
                     Box(Modifier.padding(top = 6.dp)) { EpgInfo(vm, sel, showProgress = false) }
                 }
-                Hint(if (isTv) "OK: İzle · Uzun OK: Favori ★ · ◀: Gruplar · ▶: Kapat" else "Dokun: İzle · Uzun bas: Favori ★")
+                Hint(if (isTv) "OK: İzle · Uzun OK: Favori ★ · ◀: Gruplar · ▶: Kapat" else "Dokun: İzle · Uzun bas: Favori ★ · 5 sn dokunulmazsa kapanır")
             }
             Panel.EPG -> {
                 val planned = Recorder.scheduled

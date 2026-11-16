@@ -111,9 +111,9 @@ Film/dizi oynatırken: OK duraklat · ◀▶ 10 sn · ▲▼ 1 dk · uzun OK vey
 
 | Hareket | Canlı yayında | Film/dizide |
 |---|---|---|
-| Dokun | Alt araç çubuğu: Kanallar · Gruplar · Ara · Menü · Seçenekler · Önceki (açılışta kendiliğinden görünür) | Bilgi bandı / duraklat-oynat |
+| Dokun | Kanal listesi (üstte ◀ Gruplar · Ara · Menü · Seçenekler); 5 sn dokunulmazsa kendiliğinden kapanır | Bilgi bandı / duraklat-oynat |
 | Yukarı / aşağı kaydır | Sonraki / önceki kanal | – |
-| Sağa kaydır | Kanal listesi (üstte **◀ Gruplar** ve **Ara** düğmeleri) | – |
+| Sağa kaydır | Kanal listesi | – |
 | Sola kaydır | İzlenen kanalın seçenekleri / açık paneli kapat | – |
 | Geri (iki kez) | Uygulamadan çıkış | – |
 | Basılı tut | Seçenekler (ses, altyazı, kayıt…) | Ses / altyazı |
