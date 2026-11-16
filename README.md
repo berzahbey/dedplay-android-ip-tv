@@ -6,6 +6,8 @@ Android TV, Android telefon/tablet ve Android tabanlı araç multimedya kutular�
 
 Bu uygulama sadece bir **oynatıcıdır**. İçerik, sizin kendi (yasal) M3U listenizden veya Xtream hesabınızdan gelir.
 
+[![Son sürüm](https://img.shields.io/github/v/release/berzahbey/dedplay-android-ip-tv?label=son%20s%C3%BCr%C3%BCm&color=2ea44f)](https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest)
+
 **Son sürüm:** [⬇️ dedplay.apk indir](https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest/download/dedplay.apk)  ·  [sürüm notları](https://github.com/berzahbey/dedplay-android-ip-tv/releases/latest)
 
 Bu bağlantı her zaman en son sürümü indirir; telefonda, tablette ve araç kutusunda tarayıcıdan açılabilir.

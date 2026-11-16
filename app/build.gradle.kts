@@ -83,3 +83,14 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
+
+// Release derlemesinden sonra surum numarali bir kopya da olustur (orn. dedplay-v1.6.apk).
+// GitHub release'e ikisi de yuklenir: dedplay.apk sabit indirme linki icin, numarali olan kullanicilar icin.
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    val vName = android.defaultConfig.versionName
+    doLast {
+        val dir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val src = File(dir, "dedplay.apk")
+        if (src.exists()) src.copyTo(File(dir, "dedplay-v$vName.apk"), overwrite = true)
+    }
+}
