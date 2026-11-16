@@ -70,12 +70,14 @@ fun TvButton(text: String, modifier: Modifier = Modifier, selected: Boolean = fa
 
 @Composable
 fun AddSourceScreen(vm: AppViewModel) {
-    var name by remember { mutableStateOf("IPTV") }
-    var type by remember { mutableStateOf("xtream") }
-    var url by remember { mutableStateOf("") }
-    var host by remember { mutableStateOf("") }
-    var user by remember { mutableStateOf("") }
-    var pass by remember { mutableStateOf("") }
+    // Duzenleme modu: Ayarlar > Aktif kaynagi duzenle
+    val editing = remember { vm.sources.firstOrNull { it.id == vm.editSourceId } }
+    var name by remember { mutableStateOf(editing?.name ?: "IPTV") }
+    var type by remember { mutableStateOf(editing?.type ?: "xtream") }
+    var url by remember { mutableStateOf(if (editing?.type == "m3u") editing.url else "") }
+    var host by remember { mutableStateOf(editing?.host ?: "") }
+    var user by remember { mutableStateOf(editing?.user ?: "") }
+    var pass by remember { mutableStateOf(editing?.pass ?: "") }
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
@@ -114,7 +116,8 @@ fun AddSourceScreen(vm: AppViewModel) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     val canCancel = vm.sources.isNotEmpty()
-    BackHandler(enabled = canCancel) { vm.openScreen(Screen.SETTINGS) }
+    fun cancel() { vm.editSourceId = null; vm.openScreen(Screen.SETTINGS) }
+    BackHandler(enabled = canCancel) { cancel() }
 
     val colors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Color.White, unfocusedTextColor = Color.White,
@@ -130,12 +133,20 @@ fun AddSourceScreen(vm: AppViewModel) {
         val n = name.trim().ifEmpty { "IPTV" }
         if (type == "m3ufile") {
             val u = fileUri
+            if (u == null && editing?.type == "m3ufile") {
+                // Sadece ad degisti
+                busy = true
+                vm.updateSource(editing.copy(name = n)) { err -> busy = false; status = err ?: "" }
+                return
+            }
             if (u == null) { status = "Önce bir M3U dosyası seçin"; return }
             busy = true
             status = "Dosya yükleniyor…"
             vm.importM3uFile(u, n) { err ->
                 busy = false
                 status = err ?: ""
+                // Duzenlemede yeni dosya secildiyse eski kaynak yerine gecer
+                if (err == null && editing != null) { vm.removeSource(editing.id); vm.editSourceId = null }
             }
             return
         }
@@ -156,9 +167,13 @@ fun AddSourceScreen(vm: AppViewModel) {
         }
         busy = true
         status = "Bağlanılıyor…"
-        vm.addSource(src) { err ->
-            busy = false
-            status = err ?: ""
+        if (editing != null) {
+            vm.updateSource(src.copy(id = editing.id)) { err -> busy = false; status = err ?: "" }
+        } else {
+            vm.addSource(src) { err ->
+                busy = false
+                status = err ?: ""
+            }
         }
     }
 
@@ -170,8 +185,8 @@ fun AddSourceScreen(vm: AppViewModel) {
             .padding(horizontal = 60.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("KAYNAK EKLE", color = Accent, fontSize = 26.sp)
-        Row(
+        Text(if (editing != null) "KAYNAĞI DÜZENLE" else "KAYNAK EKLE", color = Accent, fontSize = 26.sp)
+        if (editing == null) Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
@@ -197,7 +212,8 @@ fun AddSourceScreen(vm: AppViewModel) {
                 TvButton(if (fileUri == null) "Dosya seç (.m3u / .m3u8)" else "Başka dosya seç") { pickFile() }
             }
             Text(
-                if (fileUri == null) "Telefon/tabletteki, USB bellekteki veya Download klasöründeki M3U dosyası seçilebilir."
+                if (fileUri == null && editing?.type == "m3ufile") "Mevcut dosya kullanılıyor. Değiştirmek için yeni dosya seçin."
+                else if (fileUri == null) "Telefon/tabletteki, USB bellekteki veya Download klasöründeki M3U dosyası seçilebilir."
                 else "Seçilen dosya: $fileName",
                 color = Color(0xFF94A3B8), fontSize = 15.sp
             )
@@ -212,7 +228,7 @@ fun AddSourceScreen(vm: AppViewModel) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TvButton(if (busy) "Bekleyin…" else "Kaydet ve Bağlan") { submit() }
-            if (canCancel) TvButton("İptal") { vm.openScreen(Screen.SETTINGS) }
+            if (canCancel) TvButton("İptal") { cancel() }
         }
         if (status.isNotEmpty()) Text(status, color = Color(0xFFFFD54F), fontSize = 16.sp)
         Text(

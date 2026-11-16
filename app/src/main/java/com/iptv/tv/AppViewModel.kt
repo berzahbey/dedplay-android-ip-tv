@@ -24,6 +24,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
@@ -83,6 +84,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var episodesLoading by mutableStateOf(false)
         private set
     var manageKind by mutableStateOf("live")
+    /** Kaynak ekleme ekrani duzenleme modunda acildiysa duzenlenen kaynagin id si. */
+    var editSourceId by mutableStateOf<String?>(null)
     var searchQuery by mutableStateOf("")
 
     // Ayarlar
@@ -135,6 +138,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var liveById: Map<String, Item> = emptyMap()
     private var liveOrder: Map<String, Int> = emptyMap()
 
+    /**
+     * Cihazin kendi cozucusu yoksa (orn. tablette AC3 / E-AC3 Dolby ses, UHD/4K kanallarda yaygin)
+     * FFmpeg yazilim cozucusune duser. Cihaz destekliyorsa yine donanim cozucusu kullanilir.
+     */
+    private fun renderers(app: Application) = DefaultRenderersFactory(app)
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        .setEnableDecoderFallback(true)
+
     private fun buildPlayer(app: Application): ExoPlayer {
         // Bazi IPTV yayinlari tam anahtar kare (IDR) gondermez; bu bayraklar olmadan
         // ExoPlayer goruntuyu cope atip siyah ekranda bekler.
@@ -150,7 +161,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(b[0], b[1], b[2], b[3])
             .build()
-        return ExoPlayer.Builder(app)
+        return ExoPlayer.Builder(app, renderers(app))
             .setMediaSourceFactory(
                 // DefaultDataSource: http(s) -> OkHttp, file:// (kayitlar) -> dosya
                 DefaultMediaSourceFactory(app, extractors).setDataSourceFactory(
@@ -260,6 +271,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onDone(e.message ?: "Dosya yüklenemedi")
             }
         }
+    }
+
+    /** Var olan kaynagi (ayni id ile) gunceller: favoriler / gizli gruplar korunur, liste yeniden indirilir. */
+    fun updateSource(src: Source, onDone: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val finalSrc = if (src.type == "xtream") {
+                    withContext(Dispatchers.IO) { Repository.checkAndResolveXtream(src) }
+                } else src
+                sources = sources.map { if (it.id == finalSrc.id) finalSrc else it }
+                store.saveSources(sources)
+                store.clearCache(finalSrc.id)
+                setActive(finalSrc.id)
+                loadAccount()
+                editSourceId = null
+                screen = Screen.LIVE
+                onDone(null)
+            } catch (e: Throwable) {
+                onDone(e.message ?: "Bağlanılamadı")
+            }
+        }
+    }
+
+    /** Kaynagi id ile siler (aktif olani degistirmeden). */
+    fun removeSource(id: String) {
+        val src = sources.firstOrNull { it.id == id } ?: return
+        store.clearCache(id)
+        if (src.type == "m3ufile") runCatching { File(src.url).delete() }
+        sources = sources.filter { it.id != id }
+        store.saveSources(sources)
     }
 
     fun setActive(id: String) {
@@ -878,7 +919,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
         )
         val load = DefaultLoadControl.Builder().setBufferDurationsMs(5_000, 15_000, 1_000, 2_000).build()
-        return ExoPlayer.Builder(app)
+        return ExoPlayer.Builder(app, renderers(app))
             .setMediaSourceFactory(
                 // DefaultDataSource: http(s) -> OkHttp, file:// (kayitlar) -> dosya
                 DefaultMediaSourceFactory(app, extractors).setDataSourceFactory(

@@ -46,7 +46,10 @@ fun SettingsScreen(vm: AppViewModel) {
 
     // Satir ve islem ayni yerde: siralama degisse de karismaz
     val items: List<OptionItem> = listOf(
-        OptionItem(ListRow("Kaynak ekle (M3U / Xtream)")) { vm.openScreen(Screen.ADD_SOURCE) },
+        OptionItem(ListRow("Kaynak ekle (M3U / Xtream)")) { vm.editSourceId = null; vm.openScreen(Screen.ADD_SOURCE) },
+        OptionItem(ListRow("Aktif kaynağı düzenle", sub = "sunucu / kullanıcı adı / şifre")) {
+            if (src == null) vm.toast("Kaynak yok") else { vm.editSourceId = src.id; vm.openScreen(Screen.ADD_SOURCE) }
+        },
         OptionItem(ListRow("Aktif kaynak (değiştirmek için OK)", sub = src?.name ?: "-")) { vm.cycleSource() },
         OptionItem(ListRow("Hesap bilgisi (yenilemek için OK)", sub = vm.accountLabel())) { vm.loadAccount() },
         OptionItem(ListRow("Listeyi yenile", sub = if (vm.loading) "yükleniyor…" else "otomatik: 7 günde bir")) {

@@ -297,8 +297,24 @@ fun LiveScreen(vm: AppViewModel) {
                 onLongPress = { if (panel == Panel.NONE) openOptions() },
                 onSwipeUp = { if (panel == Panel.NONE) vm.zap(1) },
                 onSwipeDown = { if (panel == Panel.NONE) vm.zap(-1) },
-                onSwipeRight = { if (panel == Panel.NONE) { touchBar = false; openChannels() } },
-                onSwipeLeft = { if (panel == Panel.NONE) { touchBar = false; openOptions() } else panel = Panel.NONE }
+                // Saga kaydir: kanallar -> gruplar -> ayarlar. Sola kaydir: geri.
+                onSwipeRight = {
+                    touchBar = false
+                    when (panel) {
+                        Panel.NONE -> openChannels()
+                        Panel.CHANNELS -> openGroups()
+                        Panel.GROUPS, Panel.MENU -> { panel = Panel.NONE; vm.openScreen(Screen.SETTINGS) }
+                        else -> panel = Panel.NONE
+                    }
+                },
+                onSwipeLeft = {
+                    touchBar = false
+                    when (panel) {
+                        Panel.NONE -> openOptions()
+                        Panel.GROUPS -> openChannels()
+                        else -> panel = Panel.NONE
+                    }
+                }
             )
             .focusRequester(fr)
             .focusable()

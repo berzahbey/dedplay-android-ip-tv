@@ -113,8 +113,8 @@ Film/dizi oynatırken: OK duraklat · ◀▶ 10 sn · ▲▼ 1 dk · uzun OK vey
 |---|---|---|
 | Dokun | Kanal listesi (üstte ◀ Gruplar · Ara · Menü · Seçenekler); 5 sn dokunulmazsa kendiliğinden kapanır | Bilgi bandı / duraklat-oynat |
 | Yukarı / aşağı kaydır | Sonraki / önceki kanal | – |
-| Sağa kaydır | Kanal listesi | – |
-| Sola kaydır | İzlenen kanalın seçenekleri / açık paneli kapat | – |
+| Sağa kaydır | Kanal listesi → gruplar → ayarlar | – |
+| Sola kaydır | Bir geri (gruplar → kanallar → kapat); panel kapalıyken kanal seçenekleri | – |
 | Geri (iki kez) | Uygulamadan çıkış | – |
 | Basılı tut | Seçenekler (ses, altyazı, kayıt…) | Ses / altyazı |
 | Çift dokun (sol / sağ) | – | 10 sn geri / ileri |

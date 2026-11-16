@@ -180,8 +180,9 @@ object Repository {
         return Library(live, movies, series, System.currentTimeMillis())
     }
 
+    /** Kategoriler, saglayicinin verdigi sirayla (LinkedHashMap sirayi korur). */
     private fun categories(src: Source, action: String): Map<String, String> {
-        val map = HashMap<String, String>()
+        val map = LinkedHashMap<String, String>()
         Http.get(api(src, action)).use { resp ->
             readObjects(resp.body!!.charStream()) { m ->
                 val id = m["category_id"]
@@ -198,15 +199,19 @@ object Repository {
         kind: String,
         build: (Map<String, String>) -> Triple<String, String, String>?
     ): List<Item> {
-        val out = ArrayList<Item>()
+        val out = ArrayList<Pair<Int, Item>>()
+        // Gruplar saglayicinin kategori sirasinda gelsin (kanal sirasi grup icinde korunur)
+        val catOrder = HashMap<String, Int>()
+        cats.keys.forEachIndexed { i, id -> catOrder[id] = i }
         Http.get(api(src, action)).use { resp ->
             readObjects(resp.body!!.charStream()) { m ->
                 val t = build(m) ?: return@readObjects
-                val group = cats[m["category_id"] ?: ""] ?: "Diğer"
-                out.add(Item(t.first, m["name"] ?: "?", t.second, group, t.third, kind))
+                val cid = m["category_id"] ?: ""
+                val group = cats[cid] ?: "Diğer"
+                out.add((catOrder[cid] ?: Int.MAX_VALUE) to Item(t.first, m["name"] ?: "?", t.second, group, t.third, kind))
             }
         }
-        return out
+        return out.sortedBy { it.first }.map { it.second }
     }
 
     /** Bir dizinin bolumlerini getirir. */
