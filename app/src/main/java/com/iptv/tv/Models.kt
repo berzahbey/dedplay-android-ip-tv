@@ -57,6 +57,8 @@ enum class Screen { LIVE, MOVIES, SERIES, SETTINGS, MANAGE_GROUPS, ADD_SOURCE, P
 enum class Panel { NONE, MENU, GROUPS, CHANNELS, OPTIONS, EPG }
 
 const val FAV_GROUP = "★ Favoriler"
+/** Favorilerin altinda: gizli gruplar haric tum canli kanallar. */
+const val ALL_GROUP = "☰ Tüm Kanallar"
 const val USER_AGENT = "IPTVSmartersPro"
 
 /** Liste otomatik yenileme araligi (7 gun). Elle: Ayarlar > Listeyi yenile. */

@@ -5,6 +5,9 @@ import java.io.BufferedReader
 object M3uParser {
     private val attrRegex = Regex("""([\w-]+)="([^"]*)"""")
 
+    /** Film / bolum dosyasi uzantilari (canli yayin degil). */
+    private val vodExt = Regex("""\.(mp4|mkv|avi|mov|m4v|wmv|webm|mpg|mpeg)(\?.*)?$""", RegexOption.IGNORE_CASE)
+
     /** Satir satir okur; buyuk listelerde de bellek sisirmez. */
     fun parse(reader: BufferedReader): Library {
         val live = ArrayList<Item>()
@@ -38,6 +41,8 @@ object M3uParser {
                     val kind = when {
                         "/movie/" in lower -> "movie"
                         "/series/" in lower -> "series"
+                        // Adresinde /movie/ olmayan ama film dosyasi olan ogeler canli TV gruplarini sisirmesin
+                        vodExt.containsMatchIn(line) -> "movie"
                         else -> "live"
                     }
                     val item = Item(line, name.ifEmpty { "Kanal" }, logo, g, line, kind)

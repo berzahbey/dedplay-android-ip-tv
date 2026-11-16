@@ -389,10 +389,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return if (includeHidden) all else all.filter { "$kind:$it" !in hidden }
     }
 
-    fun liveGroupsWithFav(): List<String> = listOf(FAV_GROUP) + groups("live")
+    fun liveGroupsWithFav(): List<String> = listOf(FAV_GROUP, ALL_GROUP) + groups("live")
+
+    private var allLiveCache: Triple<Library?, Set<String>, List<Item>>? = null
+
+    /** Gizli gruplar haric tum canli kanallar (liste sirasiyla). */
+    private fun allLive(): List<Item> {
+        val lib = library
+        val hid = hidden
+        allLiveCache?.let { if (it.first === lib && it.second === hid) return it.third }
+        val list = lib?.live?.filter { "live:${it.group}" !in hid } ?: emptyList()
+        allLiveCache = Triple(lib, hid, list)
+        return list
+    }
 
     fun itemsIn(kind: String, group: String): List<Item> {
         library; favorites
+        if (kind == "live" && group == ALL_GROUP) return allLive()
         if (kind == "live" && group == FAV_GROUP) {
             val prefix = "$activeId|"
             return favorites.filter { it.startsWith(prefix) }
@@ -408,7 +421,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val key = "$kind:$group"
         hidden = if (key in hidden) hidden - key else hidden + key
         store.saveSet("hidden", hidden)
-        if (kind == "live" && liveGroup != FAV_GROUP && liveGroup !in groups("live")) {
+        if (kind == "live" && liveGroup != FAV_GROUP && liveGroup != ALL_GROUP && liveGroup !in groups("live")) {
             liveGroup = groups("live").firstOrNull() ?: FAV_GROUP
         }
         return key in hidden

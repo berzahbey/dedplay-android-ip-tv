@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iptv.tv.AppViewModel
 import com.iptv.tv.FAV_GROUP
+import com.iptv.tv.ALL_GROUP
 import com.iptv.tv.Panel
 import com.iptv.tv.Recorder
 import com.iptv.tv.Screen
@@ -263,8 +264,8 @@ fun LiveScreen(vm: AppViewModel) {
                         }
                         Panel.GROUPS -> {
                             val g = groups.getOrNull(gSel)
-                            if (g == null || g == FAV_GROUP) {
-                                vm.toast("Favoriler grubu gizlenemez")
+                            if (g == null || g == FAV_GROUP || g == ALL_GROUP) {
+                                vm.toast("Bu grup gizlenemez")
                             } else {
                                 vm.toggleHidden("live", g)
                                 vm.toast("Gizlendi: $g  (geri açmak: Ayarlar > Grupları yönet)")
