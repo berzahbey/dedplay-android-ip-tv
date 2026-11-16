@@ -142,9 +142,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Cihazin kendi cozucusu yoksa (orn. tablette AC3 / E-AC3 Dolby ses, UHD/4K kanallarda yaygin)
      * FFmpeg yazilim cozucusune duser. Cihaz destekliyorsa yine donanim cozucusu kullanilir.
      */
-    private fun renderers(app: Application) = DefaultRenderersFactory(app)
-        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-        .setEnableDecoderFallback(true)
+    private fun renderers(app: Application) = FfmpegAudioRenderersFactory(app).setEnableDecoderFallback(true)
 
     private fun buildPlayer(app: Application): ExoPlayer {
         // Bazi IPTV yayinlari tam anahtar kare (IDR) gondermez; bu bayraklar olmadan

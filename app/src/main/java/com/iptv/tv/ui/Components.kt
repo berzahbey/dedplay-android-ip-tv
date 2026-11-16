@@ -40,7 +40,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -90,9 +94,10 @@ fun Modifier.touchGestures(
     onDoubleTap: ((Float) -> Unit)? = null,
     onSwipeUp: () -> Unit = {},
     onSwipeDown: () -> Unit = {},
-    onSwipeLeft: () -> Unit = {},
-    onSwipeRight: () -> Unit = {}
+    onSwipeLeft: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null
 ): Modifier {
+    val hasHorizontal = onSwipeLeft != null || onSwipeRight != null
     val left by rememberUpdatedState(onSwipeLeft)
     val right by rememberUpdatedState(onSwipeRight)
     val tap by rememberUpdatedState(onTap)
@@ -120,17 +125,33 @@ fun Modifier.touchGestures(
                 onVerticalDrag = { _, dy -> total += dy }
             )
         }
-        .pointerInput(Unit) {
-            var total = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { total = 0f },
-                onDragEnd = {
-                    val limit = 80.dp.toPx()
-                    if (total < -limit) left() else if (total > limit) right()
-                },
-                onHorizontalDrag = { _, dx -> total += dx }
-            )
-        }
+        .then(if (!hasHorizontal) Modifier else Modifier.pointerInput(Unit) {
+            // Yatay kaydirmayi listelerden ONCE yakala (Initial pass): yoksa listedeki satir
+            // kaydirmayi "dokunma" sanip kanali acar ve paneli kapatir.
+            awaitEachGesture {
+                val first = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val limit = 80.dp.toPx()
+                val slop = viewConfiguration.touchSlop
+                var dx = 0f
+                var dy = 0f
+                var horizontal = false
+                while (true) {
+                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                    val c = ev.changes.firstOrNull { it.id == first.id } ?: break
+                    if (!c.pressed) {
+                        if (horizontal) {
+                            c.consume()
+                            if (dx > limit) right?.invoke() else if (dx < -limit) left?.invoke()
+                        }
+                        break
+                    }
+                    val d = c.positionChange()
+                    dx += d.x; dy += d.y
+                    if (!horizontal && abs(dx) > slop && abs(dx) > abs(dy) * 1.5f) horizontal = true
+                    if (horizontal) c.consume()
+                }
+            }
+        })
 }
 
 /** Cihaz TV mi (kumanda) yoksa telefon/tablet/arac kutusu mu (dokunmatik)? */

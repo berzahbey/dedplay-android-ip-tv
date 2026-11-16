@@ -48,6 +48,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // FFmpeg ses cozucu kutuphanesi icin gerekli
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions { jvmTarget = "17" }
     lint { abortOnError = false; checkReleaseBuilds = false }
@@ -73,6 +75,7 @@ dependencies {
     implementation("androidx.media3:media3-extractor:1.3.1")
     // FFmpeg ses cozucu: cihazda AC3/E-AC3/DTS vb. yoksa (UHD/4K kanallarda ses yok sorunu)
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.3.1+1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
