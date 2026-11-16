@@ -96,6 +96,12 @@ fun AddSourceScreen(vm: AppViewModel) {
         }
     }
 
+    // Yeniden kurulumda kaynaklari, favorileri ve gizli gruplari yedekten geri getir
+    val restoreBackup = rememberBackupRestorer(vm) { msg ->
+        status = msg
+        if (msg.startsWith("Yedek yüklendi")) vm.openScreen(Screen.LIVE)
+    }
+
     fun pickFile() {
         try {
             picker.launch(arrayOf("*/*"))
@@ -165,6 +171,16 @@ fun AddSourceScreen(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("KAYNAK EKLE", color = Accent, fontSize = 26.sp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            TvButton("⟲ Yedekten geri yükle") { restoreBackup() }
+            Text(
+                "Daha önce yedek aldıysanız kaynaklar ve favoriler tek seferde gelir",
+                color = Color(0xFF94A3B8), fontSize = 14.sp
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TvButton("Xtream Kodları", selected = type == "xtream", modifier = Modifier.focusRequester(first)) { type = "xtream" }
             TvButton("M3U Linki", selected = type == "m3u") { type = "m3u" }

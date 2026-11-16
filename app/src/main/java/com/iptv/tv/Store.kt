@@ -130,7 +130,13 @@ class Store(private val ctx: Context) {
 
     fun restoreBackup(): Boolean {
         val text = readBackupText() ?: return false
-        val json = JSONObject(text)
+        return restoreFromText(text)
+    }
+
+    /** Yedek metnini (iptv_backup.json icerigi) geri yukler. Gecersizse false. */
+    fun restoreFromText(text: String): Boolean {
+        val json = try { JSONObject(text) } catch (_: Exception) { return false }
+        if (!json.has("sources")) return false
 
         if (json.has("sources")) {
             val arr = json.getJSONArray("sources")

@@ -37,6 +37,7 @@ fun SettingsScreen(vm: AppViewModel) {
     BackHandler { vm.openScreen(Screen.LIVE) }
 
     val src = vm.activeSource()
+    val restoreBackup = rememberBackupRestorer(vm) { vm.toast(it) }
 
     /** OK'a iki kez basinca calisan (onayli) islem. */
     fun confirmed(key: Int, msg: String, action: () -> Unit) {
@@ -65,7 +66,7 @@ fun SettingsScreen(vm: AppViewModel) {
             vm.toast(vm.exportBackup())
         },
         OptionItem(ListRow("Yedekten geri yükle (Download klasörü)", sub = if (confirm == 12) "Yüklemek için tekrar OK" else "iptv_backup.json")) {
-            confirmed(12, "Geri yüklemek için tekrar OK'a basın") { vm.toast(vm.importBackup()) }
+            confirmed(12, "Geri yüklemek için tekrar OK'a basın") { restoreBackup() }
         },
         OptionItem(ListRow("Favorileri temizle", sub = if (confirm == 13) "Onay için tekrar OK" else vm.favorites.size.toString())) {
             confirmed(13, "Onaylamak için tekrar OK'a basın") { vm.clearFavorites(); vm.toast("Favoriler temizlendi") }

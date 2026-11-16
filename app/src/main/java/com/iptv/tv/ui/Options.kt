@@ -13,7 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.ActivityNotFoundException
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -133,3 +138,29 @@ fun EpgInfo(vm: AppViewModel, item: Item?, showProgress: Boolean = true) {
 
 /** Panelin bos yerine dokunulunca arkadaki ekrana gecmesin. */
 fun Modifier.swallowTouches(): Modifier = this.pointerInput(Unit) { detectTapGestures { } }
+
+/**
+ * Yedekten geri yukleme: once yedegi bilinen yerlerde arar; bulamazsa (orn. uygulama
+ * yeniden kurulduysa Android 13+ eski yedegi kendiliginden okutmaz) dosya seciciyi acar.
+ * Donen fonksiyon cagrildiginda islem baslar; sonuc mesaji onResult ile gelir.
+ */
+@Composable
+fun rememberBackupRestorer(vm: AppViewModel, onResult: (String) -> Unit): () -> Unit {
+    val result by rememberUpdatedState(onResult)
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) result(vm.importBackupFromUri(uri))
+    }
+    return {
+        val auto = vm.importBackup()
+        if (auto != null) {
+            result(auto)
+        } else {
+            try {
+                result("Yedek bulunamadı, iptv_backup.json dosyasını seçin")
+                picker.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*"))
+            } catch (e: ActivityNotFoundException) {
+                result("Yedek bulunamadı ve bu cihazda dosya seçici yok")
+            }
+        }
+    }
+}

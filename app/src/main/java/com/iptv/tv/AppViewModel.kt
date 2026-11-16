@@ -1002,31 +1002,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun importBackup(): String {
+    /** Yedegi bilinen yerlerde arar (Download, uygulama klasoru). Bulunamazsa null doner. */
+    fun importBackup(): String? {
         return try {
-            val success = store.restoreBackup()
-            if (success) {
-                sources = store.loadSources()
-                activeId = store.activeSourceId
-                favorites = store.loadSet("fav")
-                hidden = store.loadSet("hidden")
-                streamExt = store.streamExt
-
-                val src = activeSource()
-                if (src != null) {
-                    val cached = store.loadLibrary(src.id)
-                    if (cached != null) updateLibrary(cached) else refresh()
-                } else {
-                    library = null
-                    rebuild(null)
-                }
-                "Yedek yüklendi (${sources.size} kaynak)"
-            } else {
-                "Yedek dosyası (iptv_backup.json) bulunamadı"
-            }
+            if (store.restoreBackup()) applyRestoredState() else null
         } catch (e: Exception) {
             "Yükleme hatası: ${e.localizedMessage ?: e.javaClass.simpleName}"
         }
+    }
+
+    /** Dosya seciciyle secilen yedek dosyasini geri yukler. */
+    fun importBackupFromUri(uri: Uri): String {
+        return try {
+            val text = getApplication<Application>().contentResolver.openInputStream(uri)
+                ?.use { it.readBytes().toString(Charsets.UTF_8) }
+                ?: return "Dosya açılamadı"
+            if (store.restoreFromText(text)) applyRestoredState() else "Bu bir dedplay yedek dosyası değil"
+        } catch (e: Exception) {
+            "Yükleme hatası: ${e.localizedMessage ?: e.javaClass.simpleName}"
+        }
+    }
+
+    private fun applyRestoredState(): String {
+        sources = store.loadSources()
+        activeId = store.activeSourceId
+        favorites = store.loadSet("fav")
+        hidden = store.loadSet("hidden")
+        streamExt = store.streamExt
+        stopPlayback()
+        currentChannel = null
+        liveGroup = FAV_GROUP
+        val src = activeSource()
+        if (src != null) {
+            if (activeId != src.id) { activeId = src.id; store.activeSourceId = src.id }
+            val cached = store.loadLibrary(src.id)
+            if (cached != null) updateLibrary(cached) else refresh()
+        } else {
+            library = null
+            rebuild(null)
+        }
+        return "Yedek yüklendi (${sources.size} kaynak, ${favorites.size} favori)"
     }
 
     fun toast(msg: String) {
