@@ -175,10 +175,14 @@ fun LiveScreen(vm: AppViewModel) {
         }
     }
 
-    LaunchedEffect(panel, touchTick, chanIdx, groupIdx, menuIdx) {
-        if (!isTv && (panel == Panel.CHANNELS || panel == Panel.GROUPS || panel == Panel.MENU)) {
-            delay(5000)
-            panel = Panel.NONE
+    LaunchedEffect(panel, touchTick, chanIdx, groupIdx, menuIdx, optIdx, epgIdx) {
+        if (isTv) return@LaunchedEffect
+        when (panel) {
+            // Soldaki listeler: 5 sn dokunulmazsa kapanir
+            Panel.CHANNELS, Panel.GROUPS, Panel.MENU -> { delay(5000); panel = Panel.NONE }
+            // Sagdaki secenekler / yayin akisi: okumaya zaman kalsin diye 8 sn
+            Panel.OPTIONS, Panel.EPG -> { delay(8000); panel = Panel.NONE }
+            else -> {}
         }
     }
 
