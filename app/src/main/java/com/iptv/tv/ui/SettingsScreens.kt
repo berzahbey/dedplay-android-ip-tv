@@ -91,7 +91,10 @@ fun SettingsScreen(vm: AppViewModel) {
     ) {
         Column(Modifier.fillMaxSize().padding(40.dp)) {
             Text("AYARLAR", color = Accent, fontSize = 26.sp, modifier = Modifier.padding(bottom = 16.dp))
-            TvList(rows, sel, Modifier.weight(1f).fillMaxWidth())
+            TvList(
+                rows, sel, Modifier.weight(1f).fillMaxWidth(),
+                onClick = { i -> sel = i; items.getOrNull(i)?.action?.invoke() }
+            )
             Text(
                 "▲▼: Gezin · OK: Seç · Geri: Canlı TV", color = Color(0xFF94A3B8), fontSize = 13.sp,
                 modifier = Modifier.padding(top = 8.dp)
@@ -146,7 +149,14 @@ fun ManageGroupsScreen(vm: AppViewModel) {
             )
             TvList(
                 rows, cur, Modifier.weight(1f).fillMaxWidth(),
-                emptyText = "Liste henüz yüklenmedi veya bu bölümde grup yok."
+                emptyText = "Liste henüz yüklenmedi veya bu bölümde grup yok.",
+                onClick = { i ->
+                    sel = i
+                    groups.getOrNull(i)?.let {
+                        val nowHidden = vm.toggleHidden(kind, it)
+                        vm.toast(if (nowHidden) "Gizlendi: $it" else "Gösteriliyor: $it")
+                    }
+                }
             )
         }
     }

@@ -109,6 +109,20 @@ fun RecordingsScreen(vm: AppViewModel) {
     }
     val cur = sel.coerceIn(0, (items.size - 1).coerceAtLeast(0))
 
+    /** Uzun OK / basili tut: dosyayi sil (iki kez onay). */
+    fun deleteAt(i: Int) {
+        val f = files.getOrNull(i - fileStart)
+        if (i >= fileStart && f != null) {
+            if (confirm == i) {
+                confirm = -1
+                if (vm.deleteRecording(f.file)) reload++
+            } else {
+                confirm = i
+                vm.toast("Silmek için tekrar uzun basın")
+            }
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -117,19 +131,7 @@ fun RecordingsScreen(vm: AppViewModel) {
                 onUp = { sel = (cur - 1).coerceAtLeast(0); confirm = -1; true },
                 onDown = { sel = (cur + 1).coerceAtMost((items.size - 1).coerceAtLeast(0)); confirm = -1; true },
                 onOk = { items.getOrNull(cur)?.action?.invoke() },
-                onLongOk = {
-                    // Uzun OK: dosyayi sil (iki kez onay)
-                    val f = files.getOrNull(cur - fileStart)
-                    if (cur >= fileStart && f != null) {
-                        if (confirm == cur) {
-                            confirm = -1
-                            if (vm.deleteRecording(f.file)) reload++
-                        } else {
-                            confirm = cur
-                            vm.toast("Silmek için tekrar uzun OK'a basın")
-                        }
-                    }
-                }
+                onLongOk = { deleteAt(cur) }
             )
             .focusRequester(fr)
             .focusable()
@@ -142,7 +144,9 @@ fun RecordingsScreen(vm: AppViewModel) {
             )
             TvList(
                 items.map { it.row }, cur, Modifier.weight(1f).fillMaxWidth(),
-                emptyText = "Henüz kayıt yok.\nCanlı TV'de ▶ (Seçenekler) > Kanalı kaydet veya Yayın akışı ile kayıt yapabilirsiniz."
+                emptyText = "Henüz kayıt yok.\nCanlı TV'de ▶ (Seçenekler) > Kanalı kaydet veya Yayın akışı ile kayıt yapabilirsiniz.",
+                onClick = { i -> if (sel != i) confirm = -1; sel = i; items.getOrNull(i)?.action?.invoke() },
+                onLongClick = { i -> sel = i; deleteAt(i) }
             )
             Text(
                 "OK: İzle / durdur / iptal · Uzun OK: Kaydı sil · Geri: Canlı TV",

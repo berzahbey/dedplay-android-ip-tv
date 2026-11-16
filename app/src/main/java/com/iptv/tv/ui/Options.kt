@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,18 +68,29 @@ fun playerOptions(vm: AppViewModel, live: Boolean, onEpg: () -> Unit = {}): List
 
 /** Sag tarafta acilan secenekler paneli. */
 @Composable
-fun OptionsPanel(items: List<OptionItem>, selected: Int, hint: String, title: String = "SEÇENEKLER") {
+fun OptionsPanel(
+    items: List<OptionItem>,
+    selected: Int,
+    hint: String,
+    title: String = "SEÇENEKLER",
+    onClick: ((Int) -> Unit)? = null
+) {
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .width(560.dp)
+                .width(panelWidth(560))
                 .background(PanelBg)
+                .swallowTouches()
                 .padding(12.dp)
         ) {
             PanelHeader(title)
-            TvList(items.map { it.row }, selected, Modifier.weight(1f), emptyText = "Bu kanal için yayın akışı yok.")
+            TvList(
+                items.map { it.row }, selected, Modifier.weight(1f),
+                emptyText = "Bu kanal için yayın akışı yok.",
+                onClick = onClick
+            )
             Text(hint, color = Color(0xFF94A3B8), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
         }
     }
@@ -117,3 +130,6 @@ fun EpgInfo(vm: AppViewModel, item: Item?, showProgress: Boolean = true) {
         }
     }
 }
+
+/** Panelin bos yerine dokunulunca arkadaki ekrana gecmesin. */
+fun Modifier.swallowTouches(): Modifier = this.pointerInput(Unit) { detectTapGestures { } }

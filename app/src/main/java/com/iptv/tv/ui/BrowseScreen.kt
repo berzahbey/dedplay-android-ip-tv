@@ -54,6 +54,18 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
         else vm.openScreen(Screen.LIVE)
     }
 
+    /** Sagdaki listede i. ogeyi ac (film oynat / dizi bolumlerini getir / bolumu oynat). */
+    fun openAt(i: Int) {
+        if (isSeries && eps != null) {
+            eps.getOrNull(i)?.let { vm.playVod("${vm.episodesTitle} · ${it.title}", it.url, backScreen) }
+        } else {
+            items.getOrNull(i)?.let {
+                if (isSeries) vm.openSeries(it) else vm.playVod(it.name, it.url, backScreen)
+                if (isSeries) iIdx = 0
+            }
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -82,13 +94,8 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
                 onOk = {
                     if (col == 0) {
                         col = 1; iIdx = 0
-                    } else if (isSeries && eps != null) {
-                        eps.getOrNull(iSel)?.let { vm.playVod("${vm.episodesTitle} · ${it.title}", it.url, backScreen) }
                     } else {
-                        items.getOrNull(iSel)?.let {
-                            if (isSeries) vm.openSeries(it) else vm.playVod(it.name, it.url, backScreen)
-                            if (isSeries) iIdx = 0
-                        }
+                        openAt(iSel)
                     }
                 },
                 onLongOk = {
@@ -110,7 +117,17 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
                         rows = groups.map { ListRow(it) },
                         selected = if (col == 0) gSel else -1,
                         modifier = Modifier.weight(1f),
-                        emptyText = if (vm.library == null) "Liste yükleniyor…" else "Bu bölümde içerik yok."
+                        emptyText = if (vm.library == null) "Liste yükleniyor…" else "Bu bölümde içerik yok.",
+                        onClick = { i ->
+                            if (isSeries && vm.episodes != null) vm.closeEpisodes()
+                            gIdx = i; col = 1; iIdx = 0
+                        },
+                        onLongClick = { i ->
+                            groups.getOrNull(i)?.let {
+                                vm.toggleHidden(kind, it)
+                                vm.toast("Gizlendi: $it  (geri açmak: Ayarlar > Grupları yönet)")
+                            }
+                        }
                     )
                 }
                 Spacer(Modifier.width(20.dp))
@@ -118,13 +135,17 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
                     if (isSeries && eps != null) {
                         PanelHeader(vm.episodesTitle.uppercase())
                         val rows = remember(eps) { eps.map { ListRow("S${it.season} · ${it.title}") } }
-                        TvList(rows, if (col == 1) iSel else -1, Modifier.weight(1f))
+                        TvList(
+                            rows, if (col == 1) iSel else -1, Modifier.weight(1f),
+                            onClick = { i -> col = 1; iIdx = i; openAt(i) }
+                        )
                     } else {
                         PanelHeader(group?.uppercase() ?: "")
                         val rows = remember(items) { items.map { ListRow(it.name, logo = it.logo) } }
                         TvList(
                             rows, if (col == 1) iSel else -1, Modifier.weight(1f), rowHeight = 64,
-                            emptyText = if (vm.episodesLoading) "Bölümler yükleniyor…" else ""
+                            emptyText = if (vm.episodesLoading) "Bölümler yükleniyor…" else "",
+                            onClick = { i -> col = 1; iIdx = i; openAt(i) }
                         )
                     }
                 }

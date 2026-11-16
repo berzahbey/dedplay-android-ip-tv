@@ -1,6 +1,12 @@
 package com.iptv.tv.ui
 
+import android.content.ActivityNotFoundException
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,6 +78,31 @@ fun AddSourceScreen(vm: AppViewModel) {
     var pass by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var fileUri by remember { mutableStateOf<Uri?>(null) }
+    var fileName by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
+
+    // Sistem dosya secicisi (telefon, tablet; bircok Android TV'de de var)
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            fileUri = uri
+            fileName = runCatching {
+                ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0) else null
+                }
+            }.getOrNull() ?: uri.lastPathSegment ?: "dosya"
+            if (name == "IPTV") name = fileName.substringBeforeLast('.')
+            status = ""
+        }
+    }
+
+    fun pickFile() {
+        try {
+            picker.launch(arrayOf("*/*"))
+        } catch (e: ActivityNotFoundException) {
+            status = "Bu cihazda dosya seçici yok. Dosyayı bir sunucuya koyup \"M3U Linki\" olarak ekleyebilirsiniz."
+        }
+    }
 
     val focus = LocalFocusManager.current
     val first = remember { FocusRequester() }
@@ -91,6 +122,17 @@ fun AddSourceScreen(vm: AppViewModel) {
     fun submit() {
         if (busy) return
         val n = name.trim().ifEmpty { "IPTV" }
+        if (type == "m3ufile") {
+            val u = fileUri
+            if (u == null) { status = "Önce bir M3U dosyası seçin"; return }
+            busy = true
+            status = "Dosya yükleniyor…"
+            vm.importM3uFile(u, n) { err ->
+                busy = false
+                status = err ?: ""
+            }
+            return
+        }
         val src: Source
         if (type == "m3u") {
             if (url.isBlank()) { status = "M3U linkini girin"; return }
@@ -126,6 +168,7 @@ fun AddSourceScreen(vm: AppViewModel) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TvButton("Xtream Kodları", selected = type == "xtream", modifier = Modifier.focusRequester(first)) { type = "xtream" }
             TvButton("M3U Linki", selected = type == "m3u") { type = "m3u" }
+            TvButton("M3U Dosyası", selected = type == "m3ufile") { type = "m3ufile" }
         }
         val fm = Modifier.fillMaxWidth().widthIn(max = 720.dp)
         OutlinedTextField(name, { name = it }, fm, label = { Text("Kaynak adı") }, singleLine = true,
@@ -133,6 +176,15 @@ fun AddSourceScreen(vm: AppViewModel) {
         if (type == "m3u") {
             OutlinedTextField(url, { url = it }, fm, label = { Text("M3U linki (http://...)") }, singleLine = true,
                 colors = colors, keyboardOptions = next, keyboardActions = nextAction)
+        } else if (type == "m3ufile") {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TvButton(if (fileUri == null) "Dosya seç (.m3u / .m3u8)" else "Başka dosya seç") { pickFile() }
+            }
+            Text(
+                if (fileUri == null) "Telefon/tabletteki, USB bellekteki veya Download klasöründeki M3U dosyası seçilebilir."
+                else "Seçilen dosya: $fileName",
+                color = Color(0xFF94A3B8), fontSize = 15.sp
+            )
         } else {
             OutlinedTextField(host, { host = it }, fm, label = { Text("Sunucu (örn: http://sunucu.com:8080)") },
                 singleLine = true, colors = colors, keyboardOptions = next, keyboardActions = nextAction)

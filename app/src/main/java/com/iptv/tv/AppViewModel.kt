@@ -3,6 +3,9 @@ package com.iptv.tv
 import android.app.Application
 import android.content.ComponentName
 import android.content.Intent
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -125,6 +128,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Saglayicidan gelen ham yayin akisi; epg bunun saat duzeltmesi uygulanmis halidir. */
     private var epgRaw: Map<String, List<EpgEntry>> = emptyMap()
 
+    /** Arac / medya tuslari (direksiyon, kulaklik, bluetooth kumanda) icin medya oturumu. */
+    private val mediaSession: MediaSession = MediaSession(app, "dedplay")
+
     private var idx: Map<String, Map<String, List<Item>>> = emptyMap()
     private var liveById: Map<String, Item> = emptyMap()
     private var liveOrder: Map<String, Int> = emptyMap()
@@ -158,6 +164,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         Recorder.load(app)
         Recorder.ensureService(app)
+        setupMediaSession()
         applyLanguagePrefs()
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -171,6 +178,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) { playerMessage = null; failCount = 0 }
+                updateSessionState(isPlaying)
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -222,6 +230,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Secilen M3U dosyasini uygulama klasorune kopyalar ve kaynak olarak ekler.
+     * (Kopya sayesinde liste yenilemede dosyaya tekrar erisim izni gerekmez.)
+     */
+    fun importM3uFile(uri: Uri, name: String, onDone: (String?) -> Unit) {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            try {
+                val id = System.currentTimeMillis().toString()
+                val path = withContext(Dispatchers.IO) {
+                    val dir = File(ctx.filesDir, "m3u").apply { mkdirs() }
+                    val out = File(dir, "$id.m3u")
+                    val input = ctx.contentResolver.openInputStream(uri) ?: throw RuntimeException("Dosya açılamadı")
+                    input.use { inp -> out.outputStream().use { inp.copyTo(it) } }
+                    val head = out.bufferedReader().use { r -> CharArray(4096).let { buf -> String(buf, 0, r.read(buf).coerceAtLeast(0)) } }
+                    if (!head.contains("#EXTM3U", true) && !head.contains("#EXTINF", true)) {
+                        out.delete()
+                        throw RuntimeException("Bu bir M3U dosyası değil")
+                    }
+                    out.absolutePath
+                }
+                sources = sources + Source(id, name, "m3ufile", url = path)
+                store.saveSources(sources)
+                setActive(id)
+                screen = Screen.LIVE
+                onDone(null)
+            } catch (e: Throwable) {
+                onDone(e.message ?: "Dosya yüklenemedi")
+            }
+        }
+    }
+
     fun setActive(id: String) {
         activeId = id
         store.activeSourceId = id
@@ -249,6 +289,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteActive() {
         val src = activeSource() ?: return
         store.clearCache(src.id)
+        if (src.type == "m3ufile") runCatching { File(src.url).delete() }
         sources = sources.filter { it.id != src.id }
         store.saveSources(sources)
         stopPlayback()
@@ -399,6 +440,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (cur != null && cur.id != item.id) previousChannel = cur
         currentChannel = item
         store.lastChannelId = item.id
+        updateSessionTitle(item.name)
         play(liveUrl(item))
     }
 
@@ -450,6 +492,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (playingUrl != liveUrl(ch)) {
             store.lastChannelId = ch.id
+            updateSessionTitle(ch.name)
             play(liveUrl(ch))
         }
     }
@@ -466,6 +509,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun playVod(title: String, url: String, back: Screen) {
         vodTitle = title
         vodReturn = back
+        updateSessionTitle(title)
         stopPlayback()
         play(url)
         screen = Screen.PLAYER
@@ -991,7 +1035,78 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         toastJob = viewModelScope.launch { delay(2500); toastText = null }
     }
 
+    // ---------- Medya oturumu (direksiyon tuslari) ----------
+    private fun setupMediaSession() {
+        mediaSession.setCallback(object : MediaSession.Callback() {
+            override fun onSkipToNext() { mediaNext() }
+            override fun onSkipToPrevious() { mediaPrevious() }
+            override fun onFastForward() { mediaNext() }
+            override fun onRewind() { mediaPrevious() }
+            override fun onPlay() { if (!player.playWhenReady) togglePause() }
+            override fun onPause() { if (player.playWhenReady) togglePause() }
+            override fun onStop() { if (player.playWhenReady) togglePause() }
+        })
+        updateSessionState(false)
+        mediaSession.isActive = true
+    }
+
+    private fun updateSessionState(playing: Boolean) {
+        val actions = PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
+            PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or
+            PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_FAST_FORWARD or
+            PlaybackState.ACTION_REWIND or PlaybackState.ACTION_STOP
+        mediaSession.setPlaybackState(
+            PlaybackState.Builder()
+                .setActions(actions)
+                .setState(
+                    if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                    PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f
+                )
+                .build()
+        )
+    }
+
+    private fun updateSessionTitle(title: String) {
+        mediaSession.setMetadata(
+            MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, title)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, "dedplay")
+                .build()
+        )
+    }
+
+    /** Sonraki: canli TV'de sonraki kanal, filmde 30 sn ileri. */
+    fun mediaNext() {
+        when (screen) {
+            Screen.LIVE -> zap(1)
+            Screen.PLAYER -> player.seekTo(player.currentPosition + 30_000)
+            else -> {}
+        }
+    }
+
+    /** Onceki: canli TV'de onceki kanal, filmde 30 sn geri. */
+    fun mediaPrevious() {
+        when (screen) {
+            Screen.LIVE -> zap(-1)
+            Screen.PLAYER -> player.seekTo((player.currentPosition - 30_000).coerceAtLeast(0))
+            else -> {}
+        }
+    }
+
+    /** Oynat / duraklat. Canli yayinda devam ederken kanal bastan acilir (bayat yayin kalmasin). */
+    fun togglePause() {
+        if (player.playWhenReady) {
+            player.playWhenReady = false
+            if (screen == Screen.LIVE) toast("Duraklatıldı")
+        } else if (screen == Screen.LIVE) {
+            reloadCurrent()
+        } else {
+            player.playWhenReady = true
+        }
+    }
+
     override fun onCleared() {
+        runCatching { mediaSession.release() }
         player.release()
     }
 }

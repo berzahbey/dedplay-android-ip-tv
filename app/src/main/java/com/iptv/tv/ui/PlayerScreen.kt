@@ -97,7 +97,21 @@ fun PlayerScreen(vm: AppViewModel) {
                     }
                 },
                 onLongOk = { if (!showOptions) openOptions() },
-                onMenu = { if (showOptions) showOptions = false else openOptions(); true }
+                onMenu = { if (showOptions) showOptions = false else openOptions(); true },
+                onChannelUp = { seek(30_000); true },
+                onChannelDown = { seek(-30_000); true },
+                onPlayPause = { player.playWhenReady = !player.playWhenReady; poke(); true }
+            )
+            .touchGestures(
+                // Dokun: bilgi bandi gizliyse goster, gorunuyorsa duraklat/oynat
+                onTap = {
+                    if (showOptions) showOptions = false
+                    else if (!showInfo) poke()
+                    else { player.playWhenReady = !player.playWhenReady; poke() }
+                },
+                onLongPress = { if (!showOptions) openOptions() },
+                // Cift dokun: sol taraf 10 sn geri, sag taraf 10 sn ileri
+                onDoubleTap = { x -> if (!showOptions) seek(if (x < 0.5f) -10_000 else 10_000) }
             )
             .focusRequester(fr)
             .focusable()
@@ -125,13 +139,16 @@ fun PlayerScreen(vm: AppViewModel) {
                     Text("${fmt(pos)} / ${fmt(dur)}", color = Color(0xFF94A3B8), fontSize = 14.sp)
                 }
                 Text(
-                    "OK: Duraklat/Oynat · ◀▶: 10 sn · ▲▼: 1 dk · Uzun OK / Menü: Ses·Altyazı · Geri: Çık",
+                    "OK / dokun: Duraklat · ◀▶ / çift dokun: 10 sn · ▲▼: 1 dk · Uzun OK / basılı tut: Ses·Altyazı · Geri: Çık",
                     color = Color(0xFF94A3B8), fontSize = 13.sp
                 )
             }
         }
         if (showOptions) {
-            OptionsPanel(options, oSel, "OK: Değiştir · ◀ / Geri: Kapat")
+            OptionsPanel(
+                options, oSel, "OK: Değiştir · ◀ / Geri: Kapat",
+                onClick = { i -> optIdx = i; options.getOrNull(i)?.action?.invoke() }
+            )
         }
     }
 }

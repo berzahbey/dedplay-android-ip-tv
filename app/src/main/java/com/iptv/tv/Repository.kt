@@ -68,8 +68,18 @@ object Http {
 
 object Repository {
 
-    fun load(src: Source, ext: String): Library =
-        if (src.type == "m3u") loadM3u(src) else loadXtream(src, ext)
+    fun load(src: Source, ext: String): Library = when (src.type) {
+        "m3u" -> loadM3u(src)
+        "m3ufile" -> loadM3uFile(src)
+        else -> loadXtream(src, ext)
+    }
+
+    /** Cihaza yuklenmis M3U dosyasi (uygulama klasorune kopyalanmis hali). */
+    private fun loadM3uFile(src: Source): Library {
+        val f = java.io.File(src.url)
+        if (!f.exists()) throw RuntimeException("M3U dosyası bulunamadı. Kaynağı silip dosyayı yeniden ekleyin.")
+        return f.bufferedReader(Charsets.UTF_8).use { M3uParser.parse(it) }
+    }
 
     private fun loadM3u(src: Source): Library {
         Http.get(src.url).use { resp ->

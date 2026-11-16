@@ -155,6 +155,27 @@ fun MultiScreen(vm: AppViewModel) {
 
     BackHandler { if (picker) picker = false else vm.openScreen(Screen.LIVE) }
 
+    /** Secicide i. satir: [0] duzen, [1] grup, sonrasi kanal. */
+    fun pickAt(i: Int) {
+        pickIdx = i
+        when (i) {
+            0 -> {
+                layout = if (layout == 2) 4 else 2
+                vm.multiLayout = layout
+                if (focus >= layout) focus = 0
+            }
+            1 -> {
+                val gi = pickGroups.indexOf(pickGroup)
+                pickGroup = pickGroups.getOrNull((gi + 1) % pickGroups.size.coerceAtLeast(1)) ?: FAV_GROUP
+                pickIdx = 1
+            }
+            else -> pickList.getOrNull(i - 2)?.let {
+                tiles[focus] = it
+                picker = false
+            }
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -169,28 +190,13 @@ fun MultiScreen(vm: AppViewModel) {
                 onLeft = { if (picker) picker = false else moveFocus(-1, 0); true },
                 onRight = { if (!picker) moveFocus(1, 0); true },
                 onOk = {
-                    if (!picker) {
-                        openPicker()
-                    } else when (pSel) {
-                        0 -> {
-                            layout = if (layout == 2) 4 else 2
-                            vm.multiLayout = layout
-                            if (focus >= layout) focus = 0
-                        }
-                        1 -> {
-                            val gi = pickGroups.indexOf(pickGroup)
-                            pickGroup = pickGroups.getOrNull((gi + 1) % pickGroups.size.coerceAtLeast(1)) ?: FAV_GROUP
-                            pickIdx = 1
-                        }
-                        else -> pickList.getOrNull(pSel - 2)?.let {
-                            tiles[focus] = it
-                            picker = false
-                        }
-                    }
+                    if (!picker) openPicker() else pickAt(pSel)
                 },
                 // Uzun OK: secili karoyu tam ekran ac
                 onLongOk = { if (!picker) vm.fullscreenFromMulti(tiles.getOrNull(focus)) },
-                onMenu = { if (picker) picker = false else openPicker(); true }
+                onMenu = { if (picker) picker = false else openPicker(); true },
+                onChannelUp = { true },
+                onChannelDown = { true }
             )
             .focusRequester(fr)
             .focusable()
@@ -207,7 +213,10 @@ fun MultiScreen(vm: AppViewModel) {
                             loading = loadingTile[i],
                             failed = failed[i],
                             resizeMode = vm.resizeMode,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            // Dokun: karoyu sec (secili karoya dokununca kanal secici), basili tut: tam ekran
+                            onTap = { if (focus == i) openPicker() else focus = i },
+                            onLongPress = { vm.fullscreenFromMulti(tiles.getOrNull(i)) }
                         )
                     }
                 }
@@ -220,12 +229,13 @@ fun MultiScreen(vm: AppViewModel) {
                     Modifier
                         .align(Alignment.CenterStart)
                         .fillMaxHeight()
-                        .width(560.dp)
+                        .width(panelWidth(560))
                         .background(PanelBg)
+                        .swallowTouches()
                         .padding(12.dp)
                 ) {
                     PanelHeader("KARO ${focus + 1} İÇİN KANAL")
-                    TvList(pickRows, pSel, Modifier.weight(1f))
+                    TvList(pickRows, pSel, Modifier.weight(1f), onClick = { i -> pickAt(i) })
                     Text(
                         "OK: Seç · ◀ / Geri: Kapat", color = Color(0xFF94A3B8), fontSize = 13.sp,
                         modifier = Modifier.padding(top = 6.dp)
@@ -234,7 +244,7 @@ fun MultiScreen(vm: AppViewModel) {
             }
         } else {
             Text(
-                "Oklar: karo seç · OK: kanal değiştir · Uzun OK: tam ekran · Geri: çık",
+                "Oklar / dokun: karo seç · OK / tekrar dokun: kanal değiştir · Uzun OK / basılı tut: tam ekran · Geri: çık",
                 color = Color(0xFFE2E8F0), fontSize = 13.sp,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -254,11 +264,14 @@ private fun Tile(
     loading: Boolean,
     failed: Boolean,
     resizeMode: Int,
-    modifier: Modifier
+    modifier: Modifier,
+    onTap: () -> Unit = {},
+    onLongPress: () -> Unit = {}
 ) {
     Box(
         modifier
             .padding(2.dp)
+            .touchGestures(onTap = onTap, onLongPress = onLongPress)
             .then(if (focused) Modifier.border(3.dp, Accent) else Modifier)
             .background(Color.Black)
     ) {

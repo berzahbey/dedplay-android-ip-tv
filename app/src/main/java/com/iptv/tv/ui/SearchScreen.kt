@@ -154,7 +154,16 @@ fun SearchScreen(vm: AppViewModel) {
                 },
                 selected = if (listFocused) cur else -1,
                 modifier = Modifier.fillMaxSize(),
-                rowHeight = 60
+                rowHeight = 60,
+                onClick = { i -> sel = i; results.getOrNull(i)?.let { vm.openSearchResult(it) } },
+                onLongClick = { i ->
+                    results.getOrNull(i)?.let {
+                        if (it.kind == "live") {
+                            val added = vm.toggleFavorite(it)
+                            vm.toast(if (added) "★ Favorilere eklendi: ${it.name}" else "Favorilerden çıkarıldı: ${it.name}")
+                        }
+                    }
+                }
             )
         }
         Text(

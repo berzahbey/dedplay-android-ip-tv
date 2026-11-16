@@ -3,6 +3,9 @@ package com.iptv.tv.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -106,12 +109,50 @@ fun LiveScreen(vm: AppViewModel) {
         panel = Panel.OPTIONS
     }
 
-    fun selectGroup() {
-        val g = groups.getOrNull(gSel) ?: return
+    fun selectGroup(index: Int = gSel) {
+        val g = groups.getOrNull(index) ?: return
         vm.liveGroup = g
         val list = vm.itemsIn("live", g)
         chanIdx = list.indexOfFirst { it.id == vm.currentChannel?.id }.coerceAtLeast(0)
         panel = Panel.CHANNELS
+    }
+
+    fun menuAction(i: Int) {
+        when (i) {
+            0 -> panel = Panel.NONE
+            1 -> vm.openScreen(Screen.MOVIES)
+            2 -> vm.openScreen(Screen.SERIES)
+            3 -> vm.openScreen(Screen.SEARCH)
+            4 -> vm.openScreen(Screen.MULTI)
+            5 -> vm.openScreen(Screen.RECORDINGS)
+            6 -> openOptions()
+            else -> vm.openScreen(Screen.SETTINGS)
+        }
+    }
+
+    fun toggleFav(it: com.iptv.tv.Item) {
+        val added = vm.toggleFavorite(it)
+        vm.toast(if (added) "★ Favorilere eklendi: ${it.name}" else "Favorilerden çıkarıldı: ${it.name}")
+    }
+
+    fun optionAt(i: Int) {
+        options.getOrNull(i)?.let {
+            optIdx = i
+            it.action()
+            if (it.closes) panel = Panel.NONE
+        }
+    }
+
+    fun epgAt(i: Int) {
+        val ch = vm.currentChannel
+        val e = epgList.getOrNull(i)
+        if (ch != null && e != null) { epgIdx = i; vm.scheduleProgram(ch, e) }
+    }
+
+    // Dokunmatik arac cubugu (ekrana dokununca birkac saniye gorunur)
+    var touchBar by remember { mutableStateOf(false) }
+    LaunchedEffect(touchBar) {
+        if (touchBar) { delay(6000); touchBar = false }
     }
 
     // Geri tusu uygulamadan cikarmaz: panel aciksa kapatir, degilse uyarir. Cikis: Home tusu.
@@ -173,30 +214,14 @@ fun LiveScreen(vm: AppViewModel) {
                 onOk = {
                     when (panel) {
                         Panel.NONE -> openChannels()
-                        Panel.MENU -> when (menuIdx) {
-                            0 -> panel = Panel.NONE
-                            1 -> vm.openScreen(Screen.MOVIES)
-                            2 -> vm.openScreen(Screen.SERIES)
-                            3 -> vm.openScreen(Screen.SEARCH)
-                            4 -> vm.openScreen(Screen.MULTI)
-                            5 -> vm.openScreen(Screen.RECORDINGS)
-                            6 -> openOptions()
-                            else -> vm.openScreen(Screen.SETTINGS)
-                        }
+                        Panel.MENU -> menuAction(menuIdx)
                         Panel.GROUPS -> selectGroup()
                         Panel.CHANNELS -> channels.getOrNull(cSel)?.let {
                             vm.playLive(it)
                             panel = Panel.NONE
                         }
-                        Panel.OPTIONS -> options.getOrNull(oSel)?.let {
-                            it.action()
-                            if (it.closes) panel = Panel.NONE
-                        }
-                        Panel.EPG -> {
-                            val ch = vm.currentChannel
-                            val e = epgList.getOrNull(eSel)
-                            if (ch != null && e != null) vm.scheduleProgram(ch, e)
-                        }
+                        Panel.OPTIONS -> optionAt(oSel)
+                        Panel.EPG -> epgAt(eSel)
                     }
                 },
                 onLongOk = {
@@ -233,7 +258,16 @@ fun LiveScreen(vm: AppViewModel) {
                     if (panel == Panel.OPTIONS || panel == Panel.EPG) panel = Panel.NONE else openOptions()
                     true
                 },
-                onLastChannel = { vm.goPrevious(); true }
+                onLastChannel = { vm.goPrevious(); true },
+                onPlayPause = { vm.togglePause(); true }
+            )
+            .touchGestures(
+                onTap = {
+                    if (panel != Panel.NONE) panel = Panel.NONE else touchBar = !touchBar
+                },
+                onLongPress = { if (panel == Panel.NONE) openOptions() },
+                onSwipeUp = { if (panel == Panel.NONE) vm.zap(1) },
+                onSwipeDown = { if (panel == Panel.NONE) vm.zap(-1) }
             )
             .focusRequester(fr)
             .focusable()
@@ -331,7 +365,8 @@ fun LiveScreen(vm: AppViewModel) {
                 TvList(
                     rows = MENU_ITEMS.map { ListRow(it) },
                     selected = menuIdx,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { i -> menuIdx = i; menuAction(i) }
                 )
                 Hint("OK: Seç · ▶: Gruplar")
             }
@@ -340,7 +375,8 @@ fun LiveScreen(vm: AppViewModel) {
                 TvList(
                     rows = groups.map { ListRow(it, badge = if (it == vm.liveGroup) "•" else "") },
                     selected = gSel,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = { i -> groupIdx = i; selectGroup(i) }
                 )
                 Hint("OK: Kanallar · Uzun OK: grubu gizle · ◀: Menü · ▶: Kanallar")
             }
@@ -361,7 +397,9 @@ fun LiveScreen(vm: AppViewModel) {
                     modifier = Modifier.weight(1f),
                     emptyText = if (vm.liveGroup == FAV_GROUP)
                         "Henüz favori yok.\nBir kanalın üzerinde OK tuşuna uzun basın."
-                    else "Bu grupta kanal yok."
+                    else "Bu grupta kanal yok.",
+                    onClick = { i -> channels.getOrNull(i)?.let { vm.playLive(it); panel = Panel.NONE } },
+                    onLongClick = { i -> chanIdx = i; channels.getOrNull(i)?.let { toggleFav(it) } }
                 )
                 channels.getOrNull(cSel)?.let { sel ->
                     Box(Modifier.padding(top = 6.dp)) { EpgInfo(vm, sel, showProgress = false) }
@@ -382,14 +420,34 @@ fun LiveScreen(vm: AppViewModel) {
                 OptionsPanel(
                     rows.map { OptionItem(it) {} }, eSel,
                     "OK: Kaydet / planla · ◀: Geri",
-                    title = "YAYIN AKIŞI · " + (vm.currentChannel?.name ?: "")
+                    title = "YAYIN AKIŞI · " + (vm.currentChannel?.name ?: ""),
+                    onClick = { i -> epgAt(i) }
                 )
             }
             Panel.OPTIONS -> OptionsPanel(
                 options, oSel,
-                "OK: Değiştir · ◀ / Geri: Kapat"
+                "OK: Değiştir · ◀ / Geri: Kapat",
+                onClick = { i -> optionAt(i) }
             )
-            Panel.NONE -> {}
+            Panel.NONE -> if (touchBar) {
+                // Dokunmatik arac cubugu
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp)
+                        .background(Color(0xEE121418), RoundedCornerShape(12.dp))
+                        .swallowTouches()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TvButton("Kanallar") { touchBar = false; openChannels() }
+                    TvButton("Gruplar") { touchBar = false; openGroups() }
+                    TvButton("Menü") { touchBar = false; menuIdx = 0; panel = Panel.MENU }
+                    TvButton("Seçenekler") { touchBar = false; openOptions() }
+                    TvButton("◀◀ Önceki") { vm.goPrevious() }
+                }
+            }
         }
     }
 }
@@ -401,8 +459,9 @@ private fun SidePanel(widthDp: Int, content: @Composable androidx.compose.founda
             Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
-                .width(widthDp.dp)
+                .width(panelWidth(widthDp))
                 .background(PanelBg)
+                .swallowTouches()
                 .padding(12.dp),
             content = content
         )
