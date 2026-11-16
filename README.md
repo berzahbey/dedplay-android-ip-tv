@@ -1,82 +1,168 @@
-# IPTV Player (Android TV) — Kurulum Rehberi
+# dedplay IPTV Player
 
-Bu uygulama sadece bir **oynatıcıdır**. İçerik, sizin kendi (yasal) M3U linkinizden veya Xtream hesabınızdan gelir.
+Android TV, Android telefon/tablet ve Android tabanlı araç multimedya kutuları (AI box) için IPTV oynatıcı.
 
-> **Önemli:** Uygulama Android TV / Google TV işletim sistemi olan cihazlarda çalışır (Android TV kutusu, Mi Box, Chromecast with Google TV, Android TV'li televizyon). Samsung (Tizen) veya LG (webOS) televizyonların kendi sistemine APK kurulamaz; onlar için Android TV kutusu/çubuğu gerekir.
+Bu uygulama sadece bir **oynatıcıdır**. İçerik, sizin kendi (yasal) M3U listenizden veya Xtream hesabınızdan gelir.
+
+**Son sürüm:** [`apk/dedplay-v1.2.apk`](apk/dedplay-v1.2.apk)
 
 ---
 
-## 1. Bilgisayara Android Studio kurun (bir kez)
+## Hangi cihazlarda çalışır?
 
-1. https://developer.android.com/studio adresinden **Android Studio**'yu indirip kurun (hep "Next" deyin).
-2. İlk açılışta "Standard" kurulumu seçin; gerekli dosyaları kendisi indirir (10-20 dk sürebilir).
+| Cihaz | Durum | Kontrol |
+|---|---|---|
+| **Android TV / Google TV** (Xiaomi TV, Mi Box, Chromecast with Google TV, Android TV kutuları) | ✅ Tam destek | TV kumandası |
+| **Android telefon ve tablet** | ✅ Tam destek | Dokunmatik ekran; yatay ve dikey kullanım |
+| **Android tabanlı araç kutuları (AI box)** | ✅ Çalışır | Dokunmatik ekran + **direksiyon tuşları** ile kanal değiştirme |
+| Bluetooth kumanda / klavye / kulaklık tuşları | ✅ | Sonraki/önceki = kanal değiştir, oynat/duraklat |
+| Samsung (Tizen), LG (webOS) TV, Apple TV, iPhone | ❌ | Bu sistemlere APK kurulamaz; Android TV kutusu/çubuğu gerekir |
+| Sadece CarPlay / Android Auto adaptörü (kendi Android'i olmayan kablosuz adaptörler) | ❌ | Uygulama kurulabilen, kendi Android sistemi olan kutu gerekir |
 
-## 2. Projeyi açın
+En az **Android 6.0** gerekir.
 
-1. `IPTVPlayer` klasörünü (zip'ten çıkardıktan sonra) bilgisayarınıza koyun.
-2. Android Studio > **Open** > `IPTVPlayer` klasörünü seçin.
-3. Altta "Gradle sync" çalışır; **ilk seferde 5-15 dakika** sürer, bekleyin.
-4. Eğer "Update Android Gradle Plugin?" benzeri bir öneri çıkarsa **önce "Don't remind / Hayır"** deyin; bu sürümle çalışır.
-5. Sync hata verirse en alttaki hata satırını bana aynen gönderin, düzeltirim.
+> 🚗 **Araçta güvenlik:** Video sadece araç **park halindeyken** izlenmelidir. Hollanda dahil birçok ülkede sürüş sırasında sürücünün ekranda video izlemesi yasaktır. Bazı araç kutuları araç hareket edince videoyu kendiliğinden kapatır.
 
-## 3. APK dosyasını üretin
+---
 
-Menüden: **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
-Bitince sağ altta "locate" yazar; dosya şurada olur:
-`IPTVPlayer/app/build/outputs/apk/debug/app-debug.apk`
+## Özellikler
 
-## 4. TV'ye kurun (iki yoldan biri)
+- **Kaynaklar:** Xtream kodları, M3U linki veya **M3U dosyası** (telefondan, USB'den, Download klasöründen)
+- **Canlı TV:** gruplar, ★ favoriler, grup gizleme, kanal numarasıyla geçiş, önceki kanala dönüş
+- **Yayın akışı (EPG):** şimdiki/sıradaki program ve ilerleme çubuğu (Xtream); kanal grubuna göre **saat farkı düzeltmesi** (örn. Türkiye kanalları Hollanda'dan izlenirken)
+- **Kayıt:** izlenen kanalı kaydet, şu anki programı bitene kadar kaydet, yayın akışından **ileri saate kayıt planla**; TV hafızasına veya **USB belleğe**; uygulama arka plandayken de devam eder
+- **Çoklu ekran:** 2'li veya 4'lü; ses seçili karodan gelir
+- **Filmler ve diziler** (Xtream), sezon/bölüm listesi
+- **Arama:** kanal, film ve dizi adında
+- **Ses ve altyazı seçimi;** varsayılan ses dili Türkçe
+- **Görüntü oranı** (Sığdır / Doldur / Uzat), **tampon** ayarı, **uyku zamanlayıcı**
+- **Donma koruması:** görüntü donarsa ya da yayın koparsa kanal kendiliğinden yeniden açılır
+- **Yedekleme:** kaynaklar, favoriler ve gizli gruplar Download klasörüne yedeklenir / geri yüklenir
+- **Hesap bilgisi:** Xtream bağlantı sayısı ve bitiş tarihi
 
-### Yol A — USB bellek (en kolayı)
-1. `app-debug.apk` dosyasını USB belleğe kopyalayın, belleği TV kutusuna takın.
-2. TV'de bir dosya yöneticisi (örn. "File Commander" / "X-plore") kurun, APK'ya girip kurun.
-3. İzin isterse: Ayarlar > Güvenlik > **Bilinmeyen kaynaklar**'a bu dosya yöneticisi için izin verin.
+---
 
-### Yol B — Wi-Fi ile (kablosuz)
-1. TV'de: Ayarlar > Cihaz tercihleri > Hakkında > **Derleme (Build)** satırına 7 kez OK basın.
-2. Geri gelin: **Geliştirici seçenekleri** > **USB hata ayıklama** (varsa **Ağ hata ayıklama / ADB**) açın.
-3. TV'nin IP adresini not edin (Ayarlar > Ağ).
-4. Android Studio'da alttaki **Terminal** sekmesine yazın: `adb connect TV_IP_ADRESI:5555`
-   (TV'de "izin ver" sorusuna Evet deyin.)
-5. Üstte cihaz listesinde TV görünür; yeşil **Run ▶** tuşuna basın, uygulama kurulup açılır.
+## Kurulum
 
-## 5. İlk kullanım
+### Android TV / Google TV
+**Yol A — USB bellek**
+1. `apk/dedplay-v1.2.apk` dosyasını USB belleğe kopyalayın, TV'ye takın.
+2. TV'de bir dosya yöneticisi (örn. "File Commander", "X-plore") ile APK'yı açıp kurun.
+3. İzin isterse: Ayarlar > Güvenlik > **Bilinmeyen kaynaklar** > dosya yöneticisine izin verin.
+
+**Yol B — Wi-Fi ile (bilgisayardan)**
+1. TV'de: Ayarlar > Cihaz tercihleri > Hakkında > **Derleme** satırına 7 kez OK → Geliştirici seçenekleri açılır.
+2. Geliştirici seçenekleri > **USB hata ayıklama / Ağ hata ayıklama** açın; TV'nin IP adresini not edin.
+3. Bilgisayarda:
+   ```bash
+   adb connect TV_IP_ADRESI:5555
+   adb install -r dedplay-v1.2.apk
+   ```
+
+### Android telefon / tablet
+1. Telefonun tarayıcısında bu sayfadan `apk/dedplay-v1.2.apk` dosyasını indirin (**View raw / Download**).
+2. İndirilen dosyaya dokunun; "Bilinmeyen uygulamaları yükle" izni isterse tarayıcıya izin verin.
+
+### Araç kutusu (AI box)
+- Kutunun tarayıcısıyla APK'yı indirip kurun **veya** APK'yı USB belleğe kopyalayıp kutunun dosya yöneticisiyle kurun.
+- Direksiyondaki **sonraki / önceki** tuşları kanal değiştirir. Çalışmazsa kutunun ayarlarında direksiyon tuşlarının "medya tuşu" olarak gönderildiğinden emin olun.
+
+> Güncelleme: yeni APK'yı eskisinin **üstüne** kurun; kaynaklar, favoriler ve ayarlar silinmez.
+
+---
+
+## İlk kullanım
 
 1. Uygulamayı açın; **Kaynak Ekle** ekranı gelir.
-2. **Xtream Kodları**: sunucu (örn. `http://sunucu.com:8080`), kullanıcı adı, şifre.
-   **M3U Linki**: `http://...` ile başlayan liste linki.
-3. **Kaydet ve Bağlan**. İlk yükleme büyük listelerde 1-2 dakika sürebilir; sonraki açılışlar hızlıdır (liste saklanır, 12 saatte bir kendini yeniler).
+2. Birini seçin:
+   - **Xtream Kodları:** sunucu (örn. `http://sunucu.com:8080`), kullanıcı adı, şifre
+   - **M3U Linki:** `http://...` ile başlayan liste linki
+   - **M3U Dosyası:** **Dosya seç** ile cihazdaki `.m3u` / `.m3u8` dosyası
+3. **Kaydet ve Bağlan**. İlk yükleme büyük listelerde 1-2 dakika sürebilir; liste saklanır ve **7 günde bir** kendini yeniler (elle: Ayarlar > Listeyi yenile).
 
-## 6. Kumanda kullanımı
+---
 
-| Nerede | Tuş | Ne yapar |
+## Kullanım
+
+### TV kumandası (canlı yayın)
+
+| Tuş | Ne yapar |
+|---|---|
+| **◀ SOL** | Kanal listesi → (tekrar) Gruplar → (tekrar) Menü |
+| **▶ SAĞ** | İzlenen kanalın seçenekleri: ses, altyazı, görüntü oranı, kayıt, yayın akışı, çoklu ekran, uyku |
+| **▲ / ▼**, CH+ / CH− | Sonraki / önceki kanal |
+| **OK** | Kanal listesi |
+| **OK'a uzun bas** | İzlenen kanalı favoriye ekle / çıkar ★ |
+| **Rakam tuşları** | Kanal numarası (listede görünen sıra) |
+| **0** | Önceki kanala dön |
+| **Menü** tuşu | Seçenekler paneli |
+| **Geri** | Açık paneli kapatır (uygulamadan çıkmaz; çıkış: **Home**) |
+
+Listelerde: OK = seç, **uzun OK** = kanalı favoriye ekle (kanal listesinde) / grubu gizle (grup listesinde).
+**Gizlenen grupları geri açmak:** Ayarlar > *Canlı TV / Film / Dizi gruplarını yönet*.
+
+Film/dizi oynatırken: OK duraklat · ◀▶ 10 sn · ▲▼ 1 dk · uzun OK veya Menü = ses/altyazı.
+
+### Dokunmatik ekran (telefon, tablet, araç kutusu)
+
+| Hareket | Canlı yayında | Film/dizide |
 |---|---|---|
-| Canlı yayın (tam ekran) | **SAĞ** | Kanal listesi açılır |
-| Canlı yayın | **SOL** | Kanal grupları açılır (en üstte ★ Favoriler) |
-| Gruplar paneli | **SOL** (tekrar) | Ana menü: Canlı TV · Filmler · Diziler · Ayarlar |
-| Gruplar paneli | **SAĞ** veya OK | O grubun kanalları |
-| Kanal listesi | OK | Kanalı izle |
-| Kanal listesi | **OK'a uzun bas** | Kanalı favoriye ekle / çıkar (★) |
-| Gruplar paneli | **OK'a uzun bas** | Grubu **gizle** |
-| Canlı yayın | ▲ / ▼ (veya CH+/CH−) | Önceki / sonraki kanal |
-| Canlı yayın | OK'a uzun bas | Şu an izlenen kanalı favoriye ekle / çıkar |
-| Her yerde | Geri | Bir panel/ekran geri |
+| Dokun | Alt araç çubuğu: Kanallar · Gruplar · Menü · Seçenekler · Önceki | Bilgi bandı / duraklat-oynat |
+| Yukarı / aşağı kaydır | Sonraki / önceki kanal | – |
+| Basılı tut | Seçenekler (ses, altyazı, kayıt…) | Ses / altyazı |
+| Çift dokun (sol / sağ) | – | 10 sn geri / ileri |
+| Listede dokun / basılı tut | Seç / favoriye ekle | – |
 
-**Gizlenen grupları geri açmak:** Ayarlar > *Canlı TV / Film / Dizi gruplarını yönet* > OK ile göster/gizle.
+### Direksiyon ve medya tuşları
 
-Filmler ve Diziler ekranında: soldaki gruplardan seçin, SAĞ ile listeye geçin, OK ile oynatın. Oynatırken: OK duraklat, ◀▶ 10 sn, ▲▼ 1 dk atlama.
+| Tuş | Canlı yayında | Film/dizide |
+|---|---|---|
+| Sonraki ⏭ | Sonraki kanal | 30 sn ileri |
+| Önceki ⏮ | Önceki kanal | 30 sn geri |
+| Oynat / Duraklat ⏯ | Duraklat / devam (kanal yeniden açılır) | Duraklat / devam |
 
-## 7. Sorun giderme
+### Çoklu ekran
+Menü > *Çoklu ekran* (veya Seçenekler'den). Oklar/dokunma ile karo seçin; OK / seçili karoya tekrar dokunma = kanal değiştir; uzun OK / basılı tutma = tam ekran. Düzen (2'li / 4'lü) kanal seçicinin en üstünde.
 
-- **Kanal açılmıyor / "Yayın açılamadı":** Ayarlar > *Yayın formatı*'nı `m3u8` ↔ `ts` değiştirin.
+### Kayıt
+- Canlı yayında **▶ (Seçenekler)**: *Kanalı kaydet*, *Bu programı kaydet*, *Yayın akışı · kayıt planla*.
+- Menü > **Kayıtlar**: kayıtları izle (OK), sil (iki kez uzun OK), planları iptal et.
+- Ayarlar > **Kayıt yeri**: TV hafızası / USB bellek.
+
+> ⚠️ **Bağlantı sayısı:** Her çoklu ekran karosu ve izlerken yapılan her kayıt, sağlayıcıya ayrı bir bağlantı açar. Hesabınız **tek bağlantılı** ise izlerken kayıt veya çoklu ekran izlemeyi kesebilir. Bağlantı sayınızı **Ayarlar > Hesap bilgisi**'nde görebilirsiniz.
+
+---
+
+## Sorun giderme
+
+- **Kanal açılmıyor:** Ayarlar > *Yayın formatı* `m3u8` ↔ `ts` değiştirin. Bazı kanallar ilk denemede sunucu tarafında gecikir; uygulama kendiliğinden yeniden dener.
 - **Liste boş / yüklenemedi:** Link/şifre doğru mu? Ayarlar > *Listeyi yenile*.
+- **Yayın akışı saati kaymış:** o kanal açıkken ▶ > *Yayın akışı saat farkı* (grup bazında kaydedilir).
+- **Ses yanlış dilde:** ▶ > *Ses* ile değiştirin; seçim hatırlanır.
+- **M3U dosyası seçilemiyor:** Bazı Android TV'lerde sistem dosya seçicisi yoktur; dosyayı bir sunucuya koyup *M3U Linki* olarak ekleyin.
 - **Filmler/Diziler boş (M3U):** Düz M3U listeler film/dizi ayrımı içermeyebilir; Xtream kodlarıyla tam çalışır.
-- **Yazı yazmak zor:** Telefona "Android TV / Google TV" uygulamasını kurun, telefon klavyesiyle yazın.
+- **Yazı yazmak zor (TV):** Telefona "Google TV" uygulamasını kurun, telefon klavyesiyle yazın.
 
-## Henüz olmayanlar (sonraki sürüm)
-Yayın rehberi (EPG), arama, ebeveyn kilidi, kanal numarası ile geçiş.
+---
 
-## Proje yapısı (merak ederseniz)
-- `Models.kt` veri tipleri · `M3uParser.kt` M3U okuyucu · `Repository.kt` Xtream API
-- `Store.kt` favoriler/gizli gruplar/kaynaklar · `AppViewModel.kt` uygulama mantığı + oynatıcı
-- `ui/LiveScreen.kt` kumanda paneli akışı (SAĞ/SOL/uzun OK) · diğer `ui/` dosyaları ekranlar
+## Kaynaktan derleme
+
+**Android Studio:** File > Open > bu klasör → Build > Build APK(s). Release için *Build Variants* panelinde `release` seçin.
+
+**Terminal (macOS):**
+```bash
+# Gradle 8.7, Java 17 veya 21 ile çalışır (Java 25 desteklenmez)
+export JAVA_HOME="/path/to/jdk-21"
+gradle assembleRelease          # veya: ~/.gradle/wrapper/dists/gradle-8.7-bin/*/gradle-8.7/bin/gradle
+# Çıktı: app/build/outputs/apk/release/dedplay.apk
+```
+
+Release sürümü debug anahtarıyla imzalanır; böylece yeni APK eskisinin üstüne kurulur.
+
+### Proje yapısı
+- `AppViewModel.kt` — uygulama mantığı, oynatıcı, donma koruması, ses/altyazı, EPG, medya oturumu
+- `Repository.kt` — Xtream API, M3U indirme, EPG, hesap bilgisi
+- `Recorder.kt` / `RecordService.kt` — kayıt motoru ve arka plan servisi
+- `Store.kt` — kaynaklar, favoriler, ayarlar, yedekleme
+- `M3uParser.kt` — M3U okuyucu
+- `ui/` — ekranlar: `LiveScreen` (canlı TV), `MultiScreen` (çoklu ekran), `RecordingsScreen`, `SearchScreen`, `BrowseScreen` (film/dizi), `PlayerScreen`, `SettingsScreens`, `AddSourceScreen`; ortak bileşenler `Components.kt`, `Options.kt`
