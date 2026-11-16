@@ -167,9 +167,9 @@ fun LiveScreen(vm: AppViewModel) {
     // Geri tusu uygulamadan cikarmaz: panel aciksa kapatir, degilse uyarir. Cikis: Home tusu.
     BackHandler {
         if (panel != Panel.NONE) panel = Panel.NONE
-        else if (isTv) vm.toast("Çıkmak için Home tuşuna basın")
+        else if (vm.backExit == 1) vm.toast("Çıkmak için Home tuşuna basın (Ayarlar > Geri tuşu)")
         else {
-            // Telefon / tablet: 2,5 sn icinde iki kez Geri -> cikis
+            // 2,5 sn icinde iki kez Geri -> cikis (yanlislikla tek basis cikarmaz)
             val now = System.currentTimeMillis()
             if (now - lastBack < 2500) vm.exitRequested = true
             else { lastBack = now; vm.toast("Çıkmak için tekrar Geri'ye basın") }
@@ -380,6 +380,10 @@ fun LiveScreen(vm: AppViewModel) {
                             Spacer(Modifier.width(10.dp))
                             Text("★", color = Color(0xFFFFD54F), fontSize = 22.sp)
                         }
+                    }
+                    // Yayinin teknik bilgisi (cozunurluk, codec, fps, ses)
+                    if (vm.mediaInfo.isNotEmpty()) {
+                        Text(vm.mediaInfo, color = Color(0xFF94A3B8), fontSize = 15.sp, maxLines = 1)
                     }
                     EpgInfo(vm, ch)
                 }

@@ -100,10 +100,12 @@ En az **Android 6.0** gerekir.
 | **Rakam tuşları** | Kanal numarası (listede görünen sıra) |
 | **0** | Önceki kanala dön |
 | **Menü** tuşu | Seçenekler paneli |
-| **Geri** | Açık paneli kapatır (TV'de uygulamadan çıkmaz; çıkış: **Home**) |
+| **Geri** | Açık paneli kapatır; panel kapalıyken **iki kez Geri** = çıkış (Ayarlar > *Geri tuşu* ile sadece Home'a çevrilebilir) |
 
 Listelerde: OK = seç, **uzun OK** = kanalı favoriye ekle (kanal listesinde) / grubu gizle (grup listesinde).
 **Gizlenen grupları geri açmak:** Ayarlar > *Canlı TV / Film / Dizi gruplarını yönet*.
+
+**Tek kanal gizlemek:** kanal açıkken Seçenekler (▶ / Menü) > *Kanalı listeden gizle*. Geri açmak: Ayarlar > *Gizli kanalları geri aç*.
 
 Film/dizi oynatırken: OK duraklat · ◀▶ 10 sn · ▲▼ 1 dk · uzun OK veya Menü = ses/altyazı.
 

@@ -95,6 +95,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var bufferMode by mutableIntStateOf(store.bufferMode)
         private set
     var startMode by mutableIntStateOf(store.startMode)
+    var backExit by mutableIntStateOf(store.backExit)
+    /** Gizlenen tek tek kanallar: "kaynakId|kanalId" */
+    var hiddenCh by mutableStateOf(store.loadSet("hiddenCh"))
+    /** Izlenen yayinin teknik bilgisi: "FHD 1080p · H.264 · 50 fps · AAC Stereo" */
+    var mediaInfo by mutableStateOf("")
+    /** Canli kanal, Ayarlar gibi bir ekran acikken sessizce arkada caliyor (donunce aninda devam). */
+    private var liveInBackground = false
         private set
     var sleepMinutes by mutableIntStateOf(0)
         private set
@@ -217,6 +224,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             override fun onTracksChanged(tracks: Tracks) {
                 tracksVersion++
                 autoPickAudio()
+                updateMediaInfo()
+            }
+
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                updateMediaInfo()
+            }
+
+            override fun onRenderedFirstFrame() {
+                updateMediaInfo()
             }
         })
         val src = activeSource()
@@ -404,8 +420,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun itemsIn(kind: String, group: String): List<Item> {
-        library; favorites
-        if (kind == "live" && group == ALL_GROUP) return allLive()
+        library; favorites; hiddenCh
+        if (kind == "live") return visibleLive(group, liveBase(group))
+        return idx[kind]?.get(group) ?: emptyList()
+    }
+
+    private fun liveBase(group: String): List<Item> {
+        val kind = "live"
+        if (group == ALL_GROUP) return allLive()
         if (kind == "live" && group == FAV_GROUP) {
             val prefix = "$activeId|"
             return favorites.filter { it.startsWith(prefix) }
@@ -486,6 +508,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         lastFrames = -1
         failCount = 0
         decoderBlocked = false
+        liveInBackground = false
+        player.volume = 1f
+        mediaInfo = ""
         // Onceki kanalin ses/altyazi secimi yeni kanala tasinmasin (dil tercihi kalir)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
         player.setMediaItem(MediaItem.fromUri(url))
@@ -497,6 +522,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         watchJob?.cancel()
         player.stop()
         playingUrl = ""
+        liveInBackground = false
+        player.volume = 1f
+        mediaInfo = ""
     }
 
     fun playLive(item: Item) {
@@ -585,7 +613,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openScreen(s: Screen) {
-        if (s != Screen.LIVE && s != Screen.PLAYER) stopPlayback()
+        val liveNow = (screen == Screen.LIVE || liveInBackground) && playingUrl.isNotEmpty()
+        when {
+            s == Screen.LIVE -> if (liveInBackground) {
+                // Ayarlar vb. ekrandan donus: kanal zaten arkada caliyor, bastan acma
+                liveInBackground = false
+                player.volume = 1f
+                if (player.playbackState == Player.STATE_IDLE || !player.playWhenReady) reloadCurrent()
+                else { lastFrames = -1; armWatch(10_000L) }
+            }
+            s in KEEP_LIVE_SCREENS && liveNow -> {
+                liveInBackground = true
+                player.volume = 0f
+                watchJob?.cancel()
+            }
+            s != Screen.PLAYER -> stopPlayback()
+        }
         if (s != Screen.SERIES) episodes = null
         screen = s
     }
@@ -614,6 +657,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (frames != prev) { armWatch(10_000L); return }
         }
         reloadCurrent()
+    }
+
+    /** Bilgi bandi icin cozunurluk / codec / fps / ses bilgisi. */
+    private fun updateMediaInfo() {
+        val v = player.videoFormat
+        val a = player.audioFormat
+        val parts = ArrayList<String>()
+        if (v != null) {
+            val h = if (player.videoSize.height > 0) player.videoSize.height else v.height
+            when {
+                h >= 2000 -> parts.add("4K UHD")
+                h >= 1000 -> parts.add("FHD 1080p")
+                h >= 700 -> parts.add("HD 720p")
+                h > 0 -> parts.add("SD ${h}p")
+            }
+            codecName(v.sampleMimeType)?.let { parts.add(it) }
+            if (v.frameRate > 0f) parts.add("${Math.round(v.frameRate)} fps")
+        }
+        if (a != null) {
+            val ch = when (a.channelCount) {
+                1 -> " Mono"; 2 -> " Stereo"; 6 -> " 5.1"; 8 -> " 7.1"
+                else -> if (a.channelCount > 0) " ${a.channelCount}ch" else ""
+            }
+            parts.add((codecName(a.sampleMimeType) ?: "Ses") + ch)
+        }
+        mediaInfo = parts.joinToString(" · ")
+    }
+
+    private fun codecName(mime: String?): String? = when (mime) {
+        null -> null
+        "video/hevc" -> "HEVC"
+        "video/avc" -> "H.264"
+        "video/mpeg2" -> "MPEG-2"
+        "video/av01" -> "AV1"
+        "video/x-vnd.on2.vp9" -> "VP9"
+        "audio/mp4a-latm" -> "AAC"
+        "audio/ac3" -> "Dolby AC3"
+        "audio/eac3", "audio/eac3-joc" -> "Dolby E-AC3"
+        "audio/mpeg", "audio/mpeg-L2" -> "MPEG"
+        "audio/mpeg-L1" -> "MPEG"
+        "audio/opus" -> "Opus"
+        "audio/vnd.dts", "audio/vnd.dts.hd" -> "DTS"
+        else -> mime.substringAfter('/').uppercase()
     }
 
     /** Hata, cihazin goruntu cozucusunun bu formati kaldiramamasindan mi? */
@@ -655,7 +741,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         appVisible = false
         watchJob?.cancel()
         player.playWhenReady = false
-        if (screen == Screen.LIVE) player.stop()
+        if (screen == Screen.LIVE || liveInBackground) player.stop()
     }
 
     /** Uygulamaya geri donunce: canli kanali sifirdan ac, filmi kaldigi yerden surdur. */
@@ -1035,6 +1121,44 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         bufferMode = (bufferMode + 1) % BUFFER_LABELS.size
         store.bufferMode = bufferMode
         toast("Tampon: ${BUFFER_LABELS[bufferMode]} · Uygulama yeniden başlatınca geçerli olur")
+    }
+
+    fun cycleBackExit() {
+        backExit = (backExit + 1) % BACK_LABELS.size
+        store.backExit = backExit
+        toast("Geri tuşu: ${BACK_LABELS[backExit]}")
+    }
+
+    // ---------- Kanal gizleme ----------
+    private fun chKey(it: Item) = "$activeId|${it.id}"
+    fun isChannelHidden(it: Item) = chKey(it) in hiddenCh
+
+    fun toggleChannelHidden(it: Item): Boolean {
+        val k = chKey(it)
+        hiddenCh = if (k in hiddenCh) hiddenCh - k else hiddenCh + k
+        store.saveSet("hiddenCh", hiddenCh)
+        return k in hiddenCh
+    }
+
+    fun hiddenChannelCount(): Int { val p = "$activeId|"; return hiddenCh.count { it.startsWith(p) } }
+
+    fun clearHiddenChannels() {
+        val p = "$activeId|"
+        hiddenCh = hiddenCh.filterNot { it.startsWith(p) }.toSet()
+        store.saveSet("hiddenCh", hiddenCh)
+    }
+
+    private var visKey: List<Any?> = emptyList()
+    private val visCache = HashMap<String, List<Item>>()
+
+    /** Gizlenen kanallari listeden cikarir (grup basina onbellekli). */
+    private fun visibleLive(group: String, base: List<Item>): List<Item> {
+        val p = "$activeId|"
+        val hc = hiddenCh
+        if (hc.none { it.startsWith(p) }) return base
+        val key = listOf(library, hidden, hc, favorites, activeId)
+        if (key.size != visKey.size || key.indices.any { key[it] !== visKey[it] }) { visCache.clear(); visKey = key }
+        return visCache.getOrPut(group) { base.filter { "$p${it.id}" !in hc } }
     }
 
     fun cycleStartMode() {

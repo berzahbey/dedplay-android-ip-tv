@@ -29,6 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +61,10 @@ fun MultiScreen(vm: AppViewModel) {
     var layout by remember { mutableIntStateOf(vm.multiLayout) }
     var focus by remember { mutableIntStateOf(0) }
     var picker by remember { mutableStateOf(false) }
+    // Islem yokken (4 sn) alt cubuk, cerceve ve kanal adlari kaybolur; tus / dokunma ile geri gelir
+    var activity by remember { mutableIntStateOf(0) }
+    var active by remember { mutableStateOf(true) }
+    LaunchedEffect(activity) { active = true; delay(4000); active = false }
     var pickIdx by remember { mutableIntStateOf(0) }
     var pickGroup by remember { mutableStateOf(vm.liveGroup) }
     val fr = remember { FocusRequester() }
@@ -180,6 +189,12 @@ fun MultiScreen(vm: AppViewModel) {
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .onPreviewKeyEvent { activity++; false }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) { awaitPointerEvent(PointerEventPass.Initial); activity++ }
+                }
+            }
             .tvKeys(
                 onUp = { if (picker) pickIdx = (pSel - 1).coerceAtLeast(0) else moveFocus(0, -1); true },
                 onDown = {
@@ -210,6 +225,7 @@ fun MultiScreen(vm: AppViewModel) {
                             player = players[i],
                             item = tiles.getOrNull(i),
                             focused = i == focus,
+                            showUi = active || picker,
                             loading = loadingTile[i],
                             failed = failed[i],
                             resizeMode = vm.resizeMode,
@@ -242,16 +258,23 @@ fun MultiScreen(vm: AppViewModel) {
                     )
                 }
             }
-        } else {
-            Text(
-                "Oklar / dokun: karo seç · OK / tekrar dokun: kanal değiştir · Uzun OK / basılı tut: tam ekran · Geri: çık",
-                color = Color(0xFFE2E8F0), fontSize = 13.sp,
-                modifier = Modifier
+        } else if (active) {
+            // Alt cubuk: hem kumanda ipucu hem dokunulabilir dugme (odak almaz, kumandayi bozmaz)
+            Row(
+                Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 10.dp)
-                    .background(Color(0xAA000000), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-            )
+                    .padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BarChip(if (layout == 2) "⊞ 4'lü ekran" else "⊟ 2'li ekran") {
+                    layout = if (layout == 2) 4 else 2
+                    vm.multiLayout = layout
+                    if (focus >= layout) focus = 0
+                }
+                BarChip("OK: Kanal değiştir") { openPicker() }
+                BarChip("Uzun OK: Tam ekran") { vm.fullscreenFromMulti(tiles.getOrNull(focus)) }
+                BarChip("Geri: Çık") { vm.openScreen(Screen.LIVE) }
+            }
         }
     }
 }
@@ -261,6 +284,7 @@ private fun Tile(
     player: ExoPlayer,
     item: Item?,
     focused: Boolean,
+    showUi: Boolean,
     loading: Boolean,
     failed: Boolean,
     resizeMode: Int,
@@ -272,7 +296,7 @@ private fun Tile(
         modifier
             .padding(2.dp)
             .touchGestures(onTap = onTap, onLongPress = onLongPress)
-            .then(if (focused) Modifier.border(3.dp, Accent) else Modifier)
+            .then(if (focused && showUi) Modifier.border(3.dp, Accent) else Modifier)
             .background(Color.Black)
     ) {
         if (item != null) {
@@ -286,7 +310,7 @@ private fun Tile(
                 modifier = Modifier.align(Alignment.Center)
             )
         }
-        Text(
+        if (showUi || item == null) Text(
             (if (focused) "🔊 " else "") + (item?.name ?: ""),
             color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1,
             modifier = Modifier
@@ -296,4 +320,16 @@ private fun Tile(
                 .padding(horizontal = 6.dp, vertical = 2.dp)
         )
     }
+}
+
+/** Alt cubuktaki dokunulabilir yazi-dugme (kumanda odagini almaz). */
+@Composable
+private fun BarChip(text: String, onClick: () -> Unit) {
+    Text(
+        text, color = Color(0xFFE2E8F0), fontSize = 14.sp,
+        modifier = Modifier
+            .background(Color(0xCC000000), RoundedCornerShape(6.dp))
+            .pointerInput(Unit) { detectTapGestures { onClick() } }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    )
 }

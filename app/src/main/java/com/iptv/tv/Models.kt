@@ -67,4 +67,8 @@ const val AUTO_REFRESH_MS = 7L * 24 * 3600 * 1000
 val RESIZE_LABELS = listOf("Sığdır", "Doldur (kırp)", "Uzat")
 val BUFFER_LABELS = listOf("Düşük (hızlı açılış)", "Normal", "Yüksek (az takılma)")
 val START_LABELS = listOf("Favorilerdeki ilk kanal", "Son izlenen kanal")
+val BACK_LABELS = listOf("İki kez Geri ile çık", "Çıkmaz (sadece Home)")
 val SLEEP_OPTIONS = listOf(0, 30, 60, 90, 120)
+
+/** Bu ekranlar acilinca canli kanal durdurulmaz, sessizce arkada calar (donunce aninda devam). */
+val KEEP_LIVE_SCREENS = setOf(Screen.SETTINGS, Screen.MANAGE_GROUPS, Screen.SEARCH, Screen.RECORDINGS)

@@ -66,6 +66,11 @@ class Store(private val ctx: Context) {
         get() = prefs.getInt("startMode", 0)
         set(v) { prefs.edit().putInt("startMode", v).apply() }
 
+    /** Geri tusu: 0 = iki kez basinca cikar, 1 = cikmaz (sadece Home). */
+    var backExit: Int
+        get() = prefs.getInt("backExit", 0)
+        set(v) { prefs.edit().putInt("backExit", v).apply() }
+
     /** Kanal grubuna gore yayin akisi saat duzeltmesi (saat). Saglayici saati yanlis girdiginde. */
     fun epgOffset(group: String): Int = prefs.getInt("epgOff:$group", 0)
     fun setEpgOffset(group: String, hours: Int) { prefs.edit().putInt("epgOff:$group", hours).apply() }

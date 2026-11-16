@@ -25,6 +25,7 @@ import com.iptv.tv.AppViewModel
 import com.iptv.tv.BUFFER_LABELS
 import com.iptv.tv.RESIZE_LABELS
 import com.iptv.tv.START_LABELS
+import com.iptv.tv.BACK_LABELS
 import com.iptv.tv.Screen
 
 @Composable
@@ -59,12 +60,17 @@ fun SettingsScreen(vm: AppViewModel) {
         OptionItem(ListRow("Görüntü oranı", sub = RESIZE_LABELS[vm.resizeMode])) { vm.cycleResize() },
         OptionItem(ListRow("Tampon (arabellek)", sub = BUFFER_LABELS[vm.bufferMode])) { vm.cycleBuffer() },
         OptionItem(ListRow("Açılışta", sub = START_LABELS[vm.startMode])) { vm.cycleStartMode() },
+        OptionItem(ListRow("Geri tuşu", sub = BACK_LABELS[vm.backExit])) { vm.cycleBackExit() },
         OptionItem(ListRow("Uyku zamanlayıcı", sub = vm.sleepLabel())) { vm.cycleSleep() },
         OptionItem(ListRow("Kayıt yeri", sub = vm.recStorageLabel())) { vm.cycleRecStorage() },
         OptionItem(ListRow("Kayıtlar")) { vm.openScreen(Screen.RECORDINGS) },
         OptionItem(ListRow("Canlı TV gruplarını yönet")) { vm.manageKind = "live"; vm.openScreen(Screen.MANAGE_GROUPS) },
         OptionItem(ListRow("Film gruplarını yönet")) { vm.manageKind = "movie"; vm.openScreen(Screen.MANAGE_GROUPS) },
         OptionItem(ListRow("Dizi gruplarını yönet")) { vm.manageKind = "series"; vm.openScreen(Screen.MANAGE_GROUPS) },
+        OptionItem(ListRow("Gizli kanalları geri aç", sub = if (confirm == 15) "Onay için tekrar OK" else "${vm.hiddenChannelCount()} kanal gizli")) {
+            if (vm.hiddenChannelCount() == 0) vm.toast("Gizli kanal yok")
+            else confirmed(15, "Hepsini geri açmak için tekrar OK'a basın") { vm.clearHiddenChannels(); vm.toast("Gizli kanallar geri açıldı") }
+        },
         OptionItem(ListRow("Yedek oluştur (Download klasörü)", sub = "iptv_backup.json")) {
             vm.toast(vm.exportBackup())
         },

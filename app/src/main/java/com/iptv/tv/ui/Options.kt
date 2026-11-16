@@ -66,6 +66,13 @@ fun playerOptions(vm: AppViewModel, live: Boolean, onEpg: () -> Unit = {}): List
         list.add(OptionItem(ListRow("Yayın akışı · kayıt planla", sub = if (vm.epg[ch?.id ?: ""].isNullOrEmpty()) "akış yok" else "")) { onEpg() })
         list.add(OptionItem(ListRow("Yayın akışı saat farkı", sub = vm.epgOffsetLabel(ch))) { vm.cycleEpgOffset() })
         list.add(OptionItem(ListRow("Çoklu ekran (2'li / 4'lü)"), closes = true) { vm.openScreen(Screen.MULTI) })
+        if (ch != null) {
+            val hid = vm.isChannelHidden(ch)
+            list.add(OptionItem(ListRow(if (hid) "Kanalı listede göster" else "Kanalı listeden gizle", sub = ch.name)) {
+                val now = vm.toggleChannelHidden(ch)
+                vm.toast(if (now) "Gizlendi: ${ch.name}  (geri açmak: Ayarlar > Gizli kanallar)" else "Tekrar gösteriliyor: ${ch.name}")
+            })
+        }
     }
     list.add(OptionItem(ListRow("Uyku zamanlayıcı", sub = vm.sleepLabel())) { vm.cycleSleep() })
     return list
