@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="128" alt="dedplay"></p>
+
 # dedplay IPTV Player
 
 Android TV, Android telefon/tablet ve Android tabanlı araç multimedya kutuları (AI box) için IPTV oynatıcı.
