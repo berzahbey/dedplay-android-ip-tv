@@ -1,5 +1,8 @@
 package com.iptv.tv.ui
 
+import android.app.UiModeManager
+import android.content.Context
+import android.content.res.Configuration
 import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
@@ -84,8 +89,12 @@ fun Modifier.touchGestures(
     onLongPress: () -> Unit = {},
     onDoubleTap: ((Float) -> Unit)? = null,
     onSwipeUp: () -> Unit = {},
-    onSwipeDown: () -> Unit = {}
+    onSwipeDown: () -> Unit = {},
+    onSwipeLeft: () -> Unit = {},
+    onSwipeRight: () -> Unit = {}
 ): Modifier {
+    val left by rememberUpdatedState(onSwipeLeft)
+    val right by rememberUpdatedState(onSwipeRight)
     val tap by rememberUpdatedState(onTap)
     val long by rememberUpdatedState(onLongPress)
     val dbl by rememberUpdatedState(onDoubleTap)
@@ -111,6 +120,27 @@ fun Modifier.touchGestures(
                 onVerticalDrag = { _, dy -> total += dy }
             )
         }
+        .pointerInput(Unit) {
+            var total = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { total = 0f },
+                onDragEnd = {
+                    val limit = 80.dp.toPx()
+                    if (total < -limit) left() else if (total > limit) right()
+                },
+                onHorizontalDrag = { _, dx -> total += dx }
+            )
+        }
+}
+
+/** Cihaz TV mi (kumanda) yoksa telefon/tablet/arac kutusu mu (dokunmatik)? */
+@Composable
+fun rememberIsTv(): Boolean {
+    val ctx = LocalContext.current
+    return remember {
+        (ctx.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)?.currentModeType ==
+            Configuration.UI_MODE_TYPE_TELEVISION
+    }
 }
 
 /** Ayarlardaki goruntu orani -> PlayerView resize modu. */

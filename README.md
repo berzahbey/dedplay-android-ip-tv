@@ -100,7 +100,7 @@ En az **Android 6.0** gerekir.
 | **Rakam tuşları** | Kanal numarası (listede görünen sıra) |
 | **0** | Önceki kanala dön |
 | **Menü** tuşu | Seçenekler paneli |
-| **Geri** | Açık paneli kapatır (uygulamadan çıkmaz; çıkış: **Home**) |
+| **Geri** | Açık paneli kapatır (TV'de uygulamadan çıkmaz; çıkış: **Home**) |
 
 Listelerde: OK = seç, **uzun OK** = kanalı favoriye ekle (kanal listesinde) / grubu gizle (grup listesinde).
 **Gizlenen grupları geri açmak:** Ayarlar > *Canlı TV / Film / Dizi gruplarını yönet*.
@@ -111,8 +111,11 @@ Film/dizi oynatırken: OK duraklat · ◀▶ 10 sn · ▲▼ 1 dk · uzun OK vey
 
 | Hareket | Canlı yayında | Film/dizide |
 |---|---|---|
-| Dokun | Alt araç çubuğu: Kanallar · Gruplar · Menü · Seçenekler · Önceki | Bilgi bandı / duraklat-oynat |
+| Dokun | Alt araç çubuğu: Kanallar · Gruplar · Ara · Menü · Seçenekler · Önceki (açılışta kendiliğinden görünür) | Bilgi bandı / duraklat-oynat |
 | Yukarı / aşağı kaydır | Sonraki / önceki kanal | – |
+| Sağa kaydır | Kanal listesi (üstte **◀ Gruplar** ve **Ara** düğmeleri) | – |
+| Sola kaydır | İzlenen kanalın seçenekleri / açık paneli kapat | – |
+| Geri (iki kez) | Uygulamadan çıkış | – |
 | Basılı tut | Seçenekler (ses, altyazı, kayıt…) | Ses / altyazı |
 | Çift dokun (sol / sağ) | – | 10 sn geri / ileri |
 | Listede dokun / basılı tut | Seç / favoriye ekle | – |

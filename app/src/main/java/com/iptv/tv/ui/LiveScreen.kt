@@ -150,7 +150,11 @@ fun LiveScreen(vm: AppViewModel) {
     }
 
     // Dokunmatik arac cubugu (ekrana dokununca birkac saniye gorunur)
+    val isTv = rememberIsTv()
     var touchBar by remember { mutableStateOf(false) }
+    var lastBack by remember { mutableStateOf(0L) }
+    // Dokunmatik cihazda acilista arac cubugunu goster (Kanallar / Gruplar / Ara ...)
+    LaunchedEffect(Unit) { if (!isTv) touchBar = true }
     LaunchedEffect(touchBar) {
         if (touchBar) { delay(6000); touchBar = false }
     }
@@ -158,7 +162,13 @@ fun LiveScreen(vm: AppViewModel) {
     // Geri tusu uygulamadan cikarmaz: panel aciksa kapatir, degilse uyarir. Cikis: Home tusu.
     BackHandler {
         if (panel != Panel.NONE) panel = Panel.NONE
-        else vm.toast("Çıkmak için Home tuşuna basın")
+        else if (isTv) vm.toast("Çıkmak için Home tuşuna basın")
+        else {
+            // Telefon / tablet: 2,5 sn icinde iki kez Geri -> cikis
+            val now = System.currentTimeMillis()
+            if (now - lastBack < 2500) vm.exitRequested = true
+            else { lastBack = now; vm.toast("Çıkmak için tekrar Geri'ye basın") }
+        }
     }
 
     Box(
@@ -267,7 +277,9 @@ fun LiveScreen(vm: AppViewModel) {
                 },
                 onLongPress = { if (panel == Panel.NONE) openOptions() },
                 onSwipeUp = { if (panel == Panel.NONE) vm.zap(1) },
-                onSwipeDown = { if (panel == Panel.NONE) vm.zap(-1) }
+                onSwipeDown = { if (panel == Panel.NONE) vm.zap(-1) },
+                onSwipeRight = { if (panel == Panel.NONE) { touchBar = false; openChannels() } },
+                onSwipeLeft = { if (panel == Panel.NONE) { touchBar = false; openOptions() } else panel = Panel.NONE }
             )
             .focusRequester(fr)
             .focusable()
@@ -371,17 +383,27 @@ fun LiveScreen(vm: AppViewModel) {
                 Hint("OK: Seç · ▶: Gruplar")
             }
             Panel.GROUPS -> SidePanel(420) {
-                PanelHeader("KATEGORİLER")
+                if (isTv) PanelHeader("KATEGORİLER")
+                else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TvButton("◀ Menü") { menuIdx = 0; panel = Panel.MENU }
+                    TvButton("Ara") { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
+                    PanelHeader("KATEGORİLER")
+                }
                 TvList(
                     rows = groups.map { ListRow(it, badge = if (it == vm.liveGroup) "•" else "") },
                     selected = gSel,
                     modifier = Modifier.weight(1f),
                     onClick = { i -> groupIdx = i; selectGroup(i) }
                 )
-                Hint("OK: Kanallar · Uzun OK: grubu gizle · ◀: Menü · ▶: Kanallar")
+                Hint(if (isTv) "OK: Kanallar · Uzun OK: grubu gizle · ◀: Menü · ▶: Kanallar" else "Gruba dokun: kanalları aç")
             }
             Panel.CHANNELS -> SidePanel(620) {
-                PanelHeader(vm.liveGroup.uppercase())
+                if (isTv) PanelHeader(vm.liveGroup.uppercase())
+                else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TvButton("◀ Gruplar") { openGroups() }
+                    TvButton("Ara") { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
+                    PanelHeader(vm.liveGroup.uppercase())
+                }
                 val rows = channels.mapIndexed { i, c ->
                     val playing = c.id == vm.currentChannel?.id
                     ListRow(
@@ -404,7 +426,7 @@ fun LiveScreen(vm: AppViewModel) {
                 channels.getOrNull(cSel)?.let { sel ->
                     Box(Modifier.padding(top = 6.dp)) { EpgInfo(vm, sel, showProgress = false) }
                 }
-                Hint("OK: İzle · Uzun OK: Favori ★ · ◀: Gruplar · ▶: Kapat")
+                Hint(if (isTv) "OK: İzle · Uzun OK: Favori ★ · ◀: Gruplar · ▶: Kapat" else "Dokun: İzle · Uzun bas: Favori ★")
             }
             Panel.EPG -> {
                 val planned = Recorder.scheduled
@@ -443,6 +465,7 @@ fun LiveScreen(vm: AppViewModel) {
                 ) {
                     TvButton("Kanallar") { touchBar = false; openChannels() }
                     TvButton("Gruplar") { touchBar = false; openGroups() }
+                    TvButton("Ara") { touchBar = false; vm.openScreen(Screen.SEARCH) }
                     TvButton("Menü") { touchBar = false; menuIdx = 0; panel = Panel.MENU }
                     TvButton("Seçenekler") { touchBar = false; openOptions() }
                     TvButton("◀◀ Önceki") { vm.goPrevious() }
