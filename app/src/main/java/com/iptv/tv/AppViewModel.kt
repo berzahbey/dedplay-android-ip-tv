@@ -588,7 +588,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             ch = liveById[store.lastChannelId]
             if (ch == null) {
                 val g = groups("live").firstOrNull()
-                ch = if (g != null) idx["live"]?.get(g)?.firstOrNull() else lib.live.firstOrNull()
+                // Gizlenen / calismayan kanallar atlanir
+                ch = if (g != null) itemsIn("live", g).firstOrNull() ?: idx["live"]?.get(g)?.firstOrNull() else lib.live.firstOrNull()
             }
             if (ch == null) return
             currentChannel = ch
