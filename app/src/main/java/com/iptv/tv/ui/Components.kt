@@ -80,7 +80,10 @@ private val DIGIT_KEYS = listOf(
 @Composable
 fun panelWidth(widthDp: Int): Dp {
     val screen = LocalConfiguration.current.screenWidthDp
-    return minOf(widthDp, (screen * 0.92f).toInt()).dp
+    // Dar ekran (telefon dikey): neredeyse tam genislik. Genis ekran (TV, tablet): en fazla %40,
+    // goruntu arkada gorunmeye devam etsin.
+    val maxW = if (screen < 700) screen * 0.92f else screen * 0.40f
+    return minOf(widthDp.toFloat(), maxW).toInt().dp
 }
 
 /**
@@ -236,7 +239,7 @@ fun TvList(
     rows: List<ListRow>,
     selected: Int,
     modifier: Modifier = Modifier,
-    rowHeight: Int = 54,
+    rowHeight: Int = 44,
     emptyText: String = "",
     onClick: ((Int) -> Unit)? = null,
     onLongClick: ((Int) -> Unit)? = null
@@ -249,7 +252,7 @@ fun TvList(
         Box(modifier.padding(16.dp)) { Text(emptyText, color = Color.White, fontSize = 18.sp) }
         return
     }
-    LazyColumn(state = state, modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    LazyColumn(state = state, modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         itemsIndexed(rows) { i, r ->
             val sel = i == selected
             val click by rememberUpdatedState(onClick)
@@ -269,7 +272,7 @@ fun TvList(
                             )
                         } else Modifier
                     )
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (r.logo.isNotEmpty()) {
@@ -277,24 +280,24 @@ fun TvList(
                         model = r.logo,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.size((rowHeight - 12).dp)
+                        modifier = Modifier.size((rowHeight - 10).dp)
                     )
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(8.dp))
                 }
                 Text(
                     r.title,
                     color = if (sel) Color.White else Accent,
-                    fontSize = 19.sp,
+                    fontSize = 16.sp,
                     fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 if (r.sub.isNotEmpty()) {
-                    Text(r.sub, color = Color(0xFF94A3B8), fontSize = 14.sp, maxLines = 1)
+                    Text(r.sub, color = Color(0xFF94A3B8), fontSize = 13.sp, maxLines = 1)
                     Spacer(Modifier.width(8.dp))
                 }
-                if (r.badge.isNotEmpty()) Text(r.badge, color = Color(0xFFFFD54F), fontSize = 20.sp)
+                if (r.badge.isNotEmpty()) Text(r.badge, color = Color(0xFFFFD54F), fontSize = 16.sp)
             }
         }
     }
