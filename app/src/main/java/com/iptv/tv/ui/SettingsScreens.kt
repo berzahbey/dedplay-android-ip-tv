@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -26,6 +27,7 @@ import com.iptv.tv.BUFFER_LABELS
 import com.iptv.tv.RESIZE_LABELS
 import com.iptv.tv.START_LABELS
 import com.iptv.tv.BACK_LABELS
+import com.iptv.tv.REFRESH_LABELS
 import com.iptv.tv.Screen
 
 @Composable
@@ -38,6 +40,10 @@ fun SettingsScreen(vm: AppViewModel) {
     BackHandler { vm.openScreen(Screen.LIVE) }
 
     val src = vm.activeSource()
+    val ctx = LocalContext.current
+    val appVersion = remember {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
     val restoreBackup = rememberBackupRestorer(vm) { vm.toast(it) }
 
     /** OK'a iki kez basinca calisan (onayli) islem. */
@@ -62,9 +68,10 @@ fun SettingsScreen(vm: AppViewModel) {
         },
         OptionItem(ListRow("Aktif kaynak (değiştirmek için OK)", sub = src?.name ?: "-")) { vm.cycleSource() },
         OptionItem(ListRow("Hesap bilgisi (yenilemek için OK)", sub = vm.accountLabel())) { vm.loadAccount() },
-        OptionItem(ListRow("Listeyi yenile", sub = if (vm.loading) "yükleniyor…" else "otomatik: 7 günde bir")) {
+        OptionItem(ListRow("Listeyi şimdi yenile", sub = if (vm.loading) "yükleniyor…" else "son güncelleme: ${vm.libraryAgeLabel()}")) {
             vm.refresh(); vm.toast("Liste yenileniyor…")
         },
+        OptionItem(ListRow("Otomatik liste yenileme", sub = REFRESH_LABELS[vm.refreshMode])) { vm.cycleRefreshMode() },
     ) + scanItems + listOf(
         OptionItem(ListRow("Yayın formatı (Xtream)", sub = vm.streamExt)) { vm.toggleExt() },
         OptionItem(ListRow("Görüntü oranı", sub = RESIZE_LABELS[vm.resizeMode])) { vm.cycleResize() },
@@ -93,7 +100,8 @@ fun SettingsScreen(vm: AppViewModel) {
         OptionItem(ListRow("Aktif kaynağı sil", sub = if (confirm == 14) "Onay için tekrar OK" else "")) {
             confirmed(14, "Silmek için tekrar OK'a basın") { vm.deleteActive() }
         },
-        OptionItem(ListRow("Uygulamayı yeniden başlat")) { vm.restartApp() }
+        OptionItem(ListRow("Uygulamayı yeniden başlat")) { vm.restartApp() },
+        OptionItem(ListRow("Uygulama sürümü", sub = "v$appVersion")) { vm.toast("dedplay v$appVersion") }
     )
     val rows = items.map { it.row }
 

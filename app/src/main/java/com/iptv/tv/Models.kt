@@ -62,7 +62,10 @@ const val ALL_GROUP = "☰ Tüm Kanallar"
 const val USER_AGENT = "IPTVSmartersPro"
 
 /** Liste otomatik yenileme araligi (7 gun). Elle: Ayarlar > Listeyi yenile. */
-const val AUTO_REFRESH_MS = 7L * 24 * 3600 * 1000
+/** Otomatik liste yenileme secenekleri (Ayarlar). -1 = kapali, sadece elle. */
+val REFRESH_LABELS = listOf("Her açılışta", "Günde bir", "3 günde bir", "Haftada bir", "Kapalı (sadece elle)")
+private const val DAY_MS = 24L * 3600 * 1000
+val REFRESH_MS = listOf(0L, DAY_MS, 3 * DAY_MS, 7 * DAY_MS, -1L)
 
 val RESIZE_LABELS = listOf("Sığdır", "Doldur (kırp)", "Uzat")
 val BUFFER_LABELS = listOf("Düşük (hızlı açılış)", "Normal", "Yüksek (az takılma)")

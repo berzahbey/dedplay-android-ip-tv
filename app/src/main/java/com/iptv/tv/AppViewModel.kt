@@ -101,6 +101,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var startMode by mutableIntStateOf(store.startMode)
     var backExit by mutableIntStateOf(store.backExit)
+    var refreshMode by mutableIntStateOf(store.refreshMode.coerceIn(0, REFRESH_LABELS.size - 1))
     /** Gizlenen tek tek kanallar: "kaynakId|kanalId" */
     var hiddenCh by mutableStateOf(store.loadSet("hiddenCh"))
     /** M3U taramasinda yayin vermedigi gorulen kanallar: "kaynakId|kanalId" */
@@ -251,7 +252,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val cached = store.loadLibrary(src.id)
             if (cached != null) {
                 updateLibrary(cached)
-                if (System.currentTimeMillis() - cached.updated > AUTO_REFRESH_MS) refresh()
+                if (isStale(cached)) refresh()
             } else refresh()
         }
         loadAccount()
@@ -352,7 +353,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         epgRaw = emptyMap()
         epgFetchedAt.clear()
         val cached = store.loadLibrary(id)
-        if (cached != null) updateLibrary(cached) else refresh()
+        if (cached != null) { updateLibrary(cached); if (isStale(cached)) refresh() } else refresh()
     }
 
     fun cycleSource() {
@@ -1132,6 +1133,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         bufferMode = (bufferMode + 1) % BUFFER_LABELS.size
         store.bufferMode = bufferMode
         toast("Tampon: ${BUFFER_LABELS[bufferMode]} · Uygulama yeniden başlatınca geçerli olur")
+    }
+
+    /** Kayitli liste, secilen yenileme suresinden eski mi? */
+    private fun isStale(lib: Library): Boolean {
+        val ms = REFRESH_MS.getOrElse(refreshMode) { -1L }
+        if (ms < 0) return false
+        return System.currentTimeMillis() - lib.updated >= ms
+    }
+
+    fun cycleRefreshMode() {
+        refreshMode = (refreshMode + 1) % REFRESH_LABELS.size
+        store.refreshMode = refreshMode
+        toast("Liste otomatik yenileme: ${REFRESH_LABELS[refreshMode]}")
+    }
+
+    /** Ayarlarda gosterilecek: son guncelleme zamani. */
+    fun libraryAgeLabel(): String {
+        val t = library?.updated ?: return "-"
+        val mins = (System.currentTimeMillis() - t) / 60_000
+        return when {
+            mins < 1 -> "az önce"
+            mins < 60 -> "$mins dk önce"
+            mins < 24 * 60 -> "${mins / 60} saat önce"
+            else -> "${mins / (24 * 60)} gün önce"
+        }
     }
 
     fun cycleBackExit() {

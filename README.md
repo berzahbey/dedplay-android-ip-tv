@@ -84,7 +84,7 @@ En az **Android 6.0** gerekir.
    - **Xtream Kodları:** sunucu (örn. `http://sunucu.com:8080`), kullanıcı adı, şifre
    - **M3U Linki:** `http://...` ile başlayan liste linki
    - **M3U Dosyası:** **Dosya seç** ile cihazdaki `.m3u` / `.m3u8` dosyası
-3. **Kaydet ve Bağlan**. İlk yükleme büyük listelerde 1-2 dakika sürebilir; liste saklanır ve **7 günde bir** kendini yeniler (elle: Ayarlar > Listeyi yenile).
+3. **Kaydet ve Bağlan**. İlk yükleme büyük listelerde 1-2 dakika sürebilir; liste saklanır ve varsayılan olarak **haftada bir** kendini yeniler. Ayarlar > *Otomatik liste yenileme*: her açılışta / günde bir / 3 günde bir / haftada bir / kapalı. Elle: Ayarlar > *Listeyi şimdi yenile*.
 
 ---
 
