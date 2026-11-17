@@ -68,6 +68,7 @@ fun MultiScreen(vm: AppViewModel) {
     var pickIdx by remember { mutableIntStateOf(0) }
     var pickGroup by remember { mutableStateOf(vm.liveGroup) }
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
 
     // Oynatici dinleyicileri: hata olursa 2 sn sonra yeniden dene
     DisposableEffect(Unit) {

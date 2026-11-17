@@ -48,6 +48,7 @@ fun RecordingsScreen(vm: AppViewModel) {
     var files by remember { mutableStateOf<List<RecFile>>(emptyList()) }
     var reload by remember { mutableIntStateOf(0) }
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
 
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     // Dosya listesi: acilista, bir kayit bitince/durunca ve 5 sn'de bir (boyutlar guncellensin)

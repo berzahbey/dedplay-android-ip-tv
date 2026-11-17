@@ -42,6 +42,7 @@ private fun fmt(ms: Long): String {
 fun PlayerScreen(vm: AppViewModel) {
     val player = vm.player
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
     var showInfo by remember { mutableStateOf(true) }
     var pos by remember { mutableLongStateOf(0L) }
     var dur by remember { mutableLongStateOf(0L) }

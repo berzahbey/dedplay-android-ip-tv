@@ -39,6 +39,7 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
     var gIdx by remember { mutableIntStateOf(0) }
     var iIdx by remember { mutableIntStateOf(0) }
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
 
     val groups = vm.groups(kind)

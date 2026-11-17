@@ -46,6 +46,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import kotlin.math.abs
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
@@ -337,4 +339,22 @@ fun PlayerSurface(player: Player, resizeMode: Int = 0, modifier: Modifier = Modi
         },
         update = { view -> view.resizeMode = resizeModeOf(resizeMode) }
     )
+}
+
+/**
+ * Kumanda tuslari icin yedek odak: bazi cihazlarda (ozellikle eski / ozel Android kutularinda)
+ * ekran odagini kaybedebiliyor ve ok / OK tuslari hicbir yere ulasmiyor. MainActivity boyle bir
+ * tusu yakalayinca buradaki ekrana odagi geri verip tusu tekrar gonderir.
+ */
+object KeyFocus {
+    var current: FocusRequester? = null
+}
+
+/** Ekranin tus dinleyen alanini yedek odak olarak kaydeder. */
+@Composable
+fun RegisterKeyFocus(fr: FocusRequester) {
+    DisposableEffect(fr) {
+        KeyFocus.current = fr
+        onDispose { if (KeyFocus.current === fr) KeyFocus.current = null }
+    }
 }

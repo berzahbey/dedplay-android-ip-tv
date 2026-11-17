@@ -35,6 +35,7 @@ fun SettingsScreen(vm: AppViewModel) {
     var sel by remember { mutableIntStateOf(0) }
     var confirm by remember { mutableIntStateOf(-1) }
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     LaunchedEffect(Unit) { vm.loadAccount() }
     BackHandler { vm.openScreen(Screen.LIVE) }
@@ -142,6 +143,7 @@ fun ManageGroupsScreen(vm: AppViewModel) {
     }
     var sel by remember { mutableIntStateOf(0) }
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
     BackHandler { vm.openScreen(Screen.SETTINGS) }
 

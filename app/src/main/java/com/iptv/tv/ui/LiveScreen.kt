@@ -57,6 +57,7 @@ fun LiveScreen(vm: AppViewModel) {
     var showBanner by remember { mutableStateOf(false) }
     var numBuf by remember { mutableStateOf("") }
     val fr = remember { FocusRequester() }
+    RegisterKeyFocus(fr)
 
     LaunchedEffect(vm.library) { vm.ensureLive() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
