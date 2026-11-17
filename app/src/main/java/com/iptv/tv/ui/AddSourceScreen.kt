@@ -47,7 +47,7 @@ import com.iptv.tv.Screen
 import com.iptv.tv.Source
 
 @Composable
-fun TvButton(text: String, modifier: Modifier = Modifier, selected: Boolean = false, onClick: () -> Unit) {
+fun TvButton(text: String, modifier: Modifier = Modifier, selected: Boolean = false, compact: Boolean = false, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(8.dp)
     Box(
@@ -62,9 +62,9 @@ fun TvButton(text: String, modifier: Modifier = Modifier, selected: Boolean = fa
             )
             .then(if (focused) Modifier.border(2.dp, Accent, shape) else Modifier)
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .padding(horizontal = if (compact) 12.dp else 24.dp, vertical = if (compact) 8.dp else 12.dp)
     ) {
-        Text(text, color = Color.White, fontSize = 18.sp)
+        Text(text, color = Color.White, fontSize = if (compact) 15.sp else 18.sp, maxLines = 1)
     }
 }
 

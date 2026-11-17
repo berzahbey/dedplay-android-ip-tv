@@ -429,8 +429,8 @@ fun LiveScreen(vm: AppViewModel) {
             Panel.GROUPS -> SidePanel(420) {
                 if (isTv) PanelHeader("KATEGORİLER")
                 else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TvButton("◀ Menü") { menuIdx = 0; panel = Panel.MENU }
-                    TvButton("Ara") { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
+                    TvButton("◀ Menü", compact = true) { menuIdx = 0; panel = Panel.MENU }
+                    TvButton("Ara", compact = true) { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
                     PanelHeader("KATEGORİLER")
                 }
                 TvList(
@@ -449,10 +449,10 @@ fun LiveScreen(vm: AppViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        TvButton("◀ Gruplar") { openGroups() }
-                        TvButton("Ara") { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
-                        TvButton("Menü") { menuIdx = 0; panel = Panel.MENU }
-                        TvButton("Seçenekler") { openOptions() }
+                        TvButton("◀ Gruplar", compact = true) { openGroups() }
+                        TvButton("Ara", compact = true) { panel = Panel.NONE; vm.openScreen(Screen.SEARCH) }
+                        TvButton("Menü", compact = true) { menuIdx = 0; panel = Panel.MENU }
+                        TvButton("Seçenekler", compact = true) { openOptions() }
                     }
                     PanelHeader(vm.liveGroup.uppercase())
                 }

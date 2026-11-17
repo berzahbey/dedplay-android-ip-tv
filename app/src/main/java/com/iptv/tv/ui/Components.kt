@@ -80,9 +80,14 @@ private val DIGIT_KEYS = listOf(
 @Composable
 fun panelWidth(widthDp: Int): Dp {
     val screen = LocalConfiguration.current.screenWidthDp
-    // Dar ekran (telefon dikey): neredeyse tam genislik. Genis ekran (TV, tablet): en fazla %40,
-    // goruntu arkada gorunmeye devam etsin.
-    val maxW = if (screen < 700) screen * 0.92f else screen * 0.40f
+    val tv = rememberIsTv()
+    // Dar ekran (telefon dikey): neredeyse tam genislik. TV: en fazla %40 (goruntu arkada gorunsun).
+    // Tablet / telefon yatay: %50 (ustteki dokunmatik dugmeler sigsin).
+    val maxW = when {
+        screen < 700 -> screen * 0.92f
+        tv -> screen * 0.40f
+        else -> screen * 0.50f
+    }
     return minOf(widthDp.toFloat(), maxW).toInt().dp
 }
 
