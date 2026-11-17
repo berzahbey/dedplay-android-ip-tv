@@ -66,6 +66,11 @@ class Store(private val ctx: Context) {
         get() = prefs.getInt("startMode", 0)
         set(v) { prefs.edit().putInt("startMode", v).apply() }
 
+    /** M3U taramasinda calismayan bulunan kanallar gizlensin mi. */
+    var hideDead: Boolean
+        get() = prefs.getBoolean("hideDead", false)
+        set(v) { prefs.edit().putBoolean("hideDead", v).apply() }
+
     /** Geri tusu: 0 = iki kez basinca cikar, 1 = cikmaz (sadece Home). */
     var backExit: Int
         get() = prefs.getInt("backExit", 0)

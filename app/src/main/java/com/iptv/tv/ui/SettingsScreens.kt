@@ -46,6 +46,15 @@ fun SettingsScreen(vm: AppViewModel) {
     }
 
     // Satir ve islem ayni yerde: siralama degisse de karismaz
+    // M3U kaynaginda: calismayan kanal taramasi
+    val scanItems: List<OptionItem> = if (!vm.isM3uSource()) emptyList() else listOf(
+        OptionItem(ListRow("Çalışmayan kanalları bul (M3U)",
+            sub = vm.scanProgress?.let { "Taranıyor: $it · durdurmak için OK" } ?: "${vm.deadCount()} çalışmıyor · taramak için OK")) {
+            vm.toggleDeadScan()
+        },
+        OptionItem(ListRow("Çalışmayan kanalları gizle", sub = if (vm.hideDead) "Açık" else "Kapalı")) { vm.toggleHideDead() }
+    )
+
     val items: List<OptionItem> = listOf(
         OptionItem(ListRow("Kaynak ekle (M3U / Xtream)")) { vm.editSourceId = null; vm.openScreen(Screen.ADD_SOURCE) },
         OptionItem(ListRow("Aktif kaynağı düzenle", sub = "sunucu / kullanıcı adı / şifre")) {
@@ -56,6 +65,7 @@ fun SettingsScreen(vm: AppViewModel) {
         OptionItem(ListRow("Listeyi yenile", sub = if (vm.loading) "yükleniyor…" else "otomatik: 7 günde bir")) {
             vm.refresh(); vm.toast("Liste yenileniyor…")
         },
+    ) + scanItems + listOf(
         OptionItem(ListRow("Yayın formatı (Xtream)", sub = vm.streamExt)) { vm.toggleExt() },
         OptionItem(ListRow("Görüntü oranı", sub = RESIZE_LABELS[vm.resizeMode])) { vm.cycleResize() },
         OptionItem(ListRow("Tampon (arabellek)", sub = BUFFER_LABELS[vm.bufferMode])) { vm.cycleBuffer() },

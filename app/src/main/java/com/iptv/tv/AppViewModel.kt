@@ -35,6 +35,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.io.File
 import java.util.Locale
 
@@ -98,6 +103,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var backExit by mutableIntStateOf(store.backExit)
     /** Gizlenen tek tek kanallar: "kaynakId|kanalId" */
     var hiddenCh by mutableStateOf(store.loadSet("hiddenCh"))
+    /** M3U taramasinda yayin vermedigi gorulen kanallar: "kaynakId|kanalId" */
+    var deadCh by mutableStateOf(store.loadSet("deadCh"))
+    var hideDead by mutableStateOf(store.hideDead)
+    /** Tarama surerken ilerleme yazisi, yoksa null. */
+    var scanProgress by mutableStateOf<String?>(null)
+    private var scanJob: Job? = null
     /** Izlenen yayinin teknik bilgisi: "FHD 1080p · H.264 · 50 fps · AAC Stereo" */
     var mediaInfo by mutableStateOf("")
     /** Canli kanal, Ayarlar gibi bir ekran acikken sessizce arkada caliyor (donunce aninda devam). */
@@ -420,7 +431,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun itemsIn(kind: String, group: String): List<Item> {
-        library; favorites; hiddenCh
+        library; favorites; hiddenCh; deadCh; hideDead
         if (kind == "live") return visibleLive(group, liveBase(group))
         return idx[kind]?.get(group) ?: emptyList()
     }
@@ -1140,6 +1151,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return k in hiddenCh
     }
 
+    // ---------- M3U kanal taramasi ----------
+    fun isM3uSource() = activeSource()?.type.let { it == "m3u" || it == "m3ufile" }
+    fun isDead(it: Item) = "$activeId|${it.id}" in deadCh
+    fun deadCount(): Int { val p = "$activeId|"; return deadCh.count { it.startsWith(p) } }
+
+    /**
+     * Sadece M3U kaynaklarinda: tum canli kanallari ayni anda en fazla 6 baglantiyla dener,
+     * yayin vermeyenleri isaretler. (Xtream'de hesabin baglanti siniri yuzunden yapilmaz.)
+     * Tarama surerken tekrar cagrilirsa durdurur.
+     */
+    fun toggleDeadScan() {
+        if (scanJob?.isActive == true) {
+            scanJob?.cancel(); scanJob = null; scanProgress = null
+            toast("Tarama durduruldu")
+            return
+        }
+        if (!isM3uSource()) { toast("Tarama sadece M3U kaynaklarında yapılabilir"); return }
+        val list = library?.live.orEmpty()
+        if (list.isEmpty()) { toast("Liste boş"); return }
+        val srcId = activeId
+        scanProgress = "0 / ${list.size}"
+        scanJob = viewModelScope.launch {
+            val dead = ConcurrentHashMap.newKeySet<String>()
+            val done = AtomicInteger(0)
+            val sem = Semaphore(6)
+            coroutineScope {
+                for (ch in list) {
+                    launch(Dispatchers.IO) {
+                        sem.withPermit {
+                            if (!Http.isAlive(ch.url)) dead.add("$srcId|${ch.id}")
+                        }
+                        val n = done.incrementAndGet()
+                        if (n % 5 == 0 || n == list.size) {
+                            withContext(Dispatchers.Main) { scanProgress = "$n / ${list.size} · ${dead.size} çalışmıyor" }
+                        }
+                    }
+                }
+            }
+            val p = "$srcId|"
+            deadCh = deadCh.filterNot { it.startsWith(p) }.toSet() + dead
+            store.saveSet("deadCh", deadCh)
+            scanProgress = null
+            scanJob = null
+            toast("Tarama bitti: ${list.size} kanaldan ${dead.size} tanesi çalışmıyor")
+        }
+    }
+
+    fun toggleHideDead() {
+        hideDead = !hideDead
+        store.hideDead = hideDead
+        toast(if (hideDead) "Çalışmayan kanallar gizlendi" else "Çalışmayan kanallar gösteriliyor")
+    }
+
+    fun clearDead() {
+        val p = "$activeId|"
+        deadCh = deadCh.filterNot { it.startsWith(p) }.toSet()
+        store.saveSet("deadCh", deadCh)
+    }
+
     fun hiddenChannelCount(): Int { val p = "$activeId|"; return hiddenCh.count { it.startsWith(p) } }
 
     fun clearHiddenChannels() {
@@ -1155,10 +1225,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun visibleLive(group: String, base: List<Item>): List<Item> {
         val p = "$activeId|"
         val hc = hiddenCh
-        if (hc.none { it.startsWith(p) }) return base
-        val key = listOf(library, hidden, hc, favorites, activeId)
+        val dc = if (hideDead) deadCh else emptySet()
+        if (hc.none { it.startsWith(p) } && dc.none { it.startsWith(p) }) return base
+        val key = listOf(library, hidden, hc, dc, favorites, activeId)
         if (key.size != visKey.size || key.indices.any { key[it] !== visKey[it] }) { visCache.clear(); visKey = key }
-        return visCache.getOrPut(group) { base.filter { "$p${it.id}" !in hc } }
+        return visCache.getOrPut(group) { base.filter { "$p${it.id}" !in hc && "$p${it.id}" !in dc } }
     }
 
     fun cycleStartMode() {

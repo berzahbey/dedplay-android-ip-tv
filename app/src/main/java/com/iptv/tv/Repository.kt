@@ -44,6 +44,36 @@ object Http {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
+    /** Kanal taramasi icin kisa sureli istemci. */
+    private val probeClient: OkHttpClient = client.newBuilder()
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(6, TimeUnit.SECONDS)
+        .callTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    /**
+     * Yayin adresi cevap veriyor mu? Sadece ilk birkac KB okunur, baglanti hemen kapatilir.
+     * m3u8 ise icerigin gercekten bir HLS listesi olmasi beklenir.
+     */
+    fun isAlive(url: String): Boolean {
+        if (!url.startsWith("http", ignoreCase = true)) return true
+        return try {
+            val req = Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
+            probeClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return false
+                val body = resp.body ?: return false
+                val buf = ByteArray(2048)
+                val n = body.byteStream().read(buf)
+                if (n <= 0) return false
+                val head = String(buf, 0, n, Charsets.ISO_8859_1)
+                val isHls = url.contains(".m3u8", true) || (resp.header("Content-Type") ?: "").contains("mpegurl", true)
+                !isHls || head.contains("#EXT")
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun get(url: String): okhttp3.Response {
         val req = Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
         val resp = try {

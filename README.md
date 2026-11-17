@@ -107,6 +107,8 @@ En az **Android 6.0** gerekir.
 Listelerde: OK = seç, **uzun OK** = kanalı favoriye ekle (kanal listesinde) / grubu gizle (grup listesinde).
 **Gizlenen grupları geri açmak:** Ayarlar > *Canlı TV / Film / Dizi gruplarını yönet*.
 
+**Çalışmayan kanalları bulmak (sadece M3U):** Ayarlar > *Çalışmayan kanalları bul*. Uygulama listedeki kanalları sırayla dener, yayın vermeyenleri ✕ ile işaretler; Ayarlar > *Çalışmayan kanalları gizle* ile listeden kaldırılır. Xtream hesaplarında bağlantı sınırı yüzünden bu tarama kapalıdır.
+
 **Tek kanal gizlemek:** kanal açıkken Seçenekler (▶ / Menü) > *Kanalı listeden gizle*. Geri açmak: Ayarlar > *Gizli kanalları geri aç*.
 
 Film/dizi oynatırken: OK duraklat · ◀▶ 10 sn · ▲▼ 1 dk · uzun OK veya Menü = ses/altyazı.

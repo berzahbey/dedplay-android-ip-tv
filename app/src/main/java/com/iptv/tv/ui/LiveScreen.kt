@@ -462,7 +462,7 @@ fun LiveScreen(vm: AppViewModel) {
                         title = c.name,
                         sub = (i + 1).toString(),
                         logo = c.logo,
-                        badge = (if (vm.isFav(c)) "★" else "") + (if (playing) "▶" else "")
+                        badge = (if (vm.isDead(c)) "✕" else "") + (if (vm.isFav(c)) "★" else "") + (if (playing) "▶" else "")
                     )
                 }
                 TvList(
