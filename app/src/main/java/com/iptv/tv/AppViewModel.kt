@@ -109,6 +109,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var hideDead by mutableStateOf(store.hideDead)
     /** Tarama surerken ilerleme yazisi, yoksa null. */
     var scanProgress by mutableStateOf<String?>(null)
+    /** GitHub'da daha yeni surum varsa bilgisi. */
+    var updateInfo by mutableStateOf<UpdateInfo?>(null)
+    /** Guncelleme denetimi / indirme surerken durum yazisi. */
+    var updateStatus by mutableStateOf<String?>(null)
+    private var updateJob: Job? = null
+    private var downloadedUpdate: java.io.File? = null
     private var scanJob: Job? = null
     /** Izlenen yayinin teknik bilgisi: "FHD 1080p · H.264 · 50 fps · AAC Stereo" */
     var mediaInfo by mutableStateOf("")
@@ -256,6 +262,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } else refresh()
         }
         loadAccount()
+        // Gunde bir kez sessiz guncelleme denetimi
+        if (System.currentTimeMillis() - store.lastUpdateCheck > 24L * 3600 * 1000) checkUpdate(manual = false)
+        else Updater.cleanup(app)
+    }
+
+    // ---------- Uygulama ici guncelleme ----------
+    fun appVersion(): String = Updater.currentVersion(getApplication())
+
+    /** GitHub'da yeni surum var mi? manual=false ise sadece yeni surum bulununca haber verir. */
+    fun checkUpdate(manual: Boolean) {
+        if (updateJob?.isActive == true) return
+        if (manual) updateStatus = "Denetleniyor…"
+        updateJob = viewModelScope.launch {
+            val latest = try {
+                withContext(Dispatchers.IO) { Updater.fetchLatest() }
+            } catch (_: Throwable) { null }
+            store.lastUpdateCheck = System.currentTimeMillis()
+            updateStatus = null
+            val cur = appVersion()
+            if (latest != null && Updater.isNewer(latest.version, cur)) {
+                updateInfo = latest
+                toast("Yeni sürüm var: v${latest.version} · Ayarlar > Güncelle")
+            } else {
+                updateInfo = null
+                if (manual) toast(if (latest == null) "Güncelleme bilgisi alınamadı (internet?)" else "En son sürümü kullanıyorsunuz (v$cur)")
+            }
+        }
+    }
+
+    /** Yeni surumu indirir ve Android'in kurulum ekranini acar. */
+    fun startUpdate() {
+        val info = updateInfo ?: run { checkUpdate(manual = true); return }
+        val ctx = getApplication<Application>()
+        if (updateJob?.isActive == true) return
+        if (!Updater.canInstall(ctx)) {
+            toast("Önce bu uygulamaya yükleme izni verin, sonra tekrar Güncelle'ye basın")
+            Updater.openInstallPermission(ctx)
+            return
+        }
+        downloadedUpdate?.takeIf { it.exists() }?.let { runCatching { Updater.install(ctx, it) }; return }
+        updateJob = viewModelScope.launch {
+            try {
+                updateStatus = "İndiriliyor… %0"
+                val file = withContext(Dispatchers.IO) {
+                    Updater.download(ctx, info) { p ->
+                        viewModelScope.launch(Dispatchers.Main) { updateStatus = "İndiriliyor… %$p" }
+                    }
+                }
+                downloadedUpdate = file
+                updateStatus = null
+                Updater.install(ctx, file)
+            } catch (e: Throwable) {
+                updateStatus = null
+                toast("Güncelleme başarısız: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
     }
 
     // ---------- Kaynaklar ----------

@@ -66,6 +66,11 @@ class Store(private val ctx: Context) {
         get() = prefs.getInt("startMode", 0)
         set(v) { prefs.edit().putInt("startMode", v).apply() }
 
+    /** Son otomatik guncelleme denetimi (ms). */
+    var lastUpdateCheck: Long
+        get() = prefs.getLong("lastUpdateCheck", 0L)
+        set(v) { prefs.edit().putLong("lastUpdateCheck", v).apply() }
+
     /** Otomatik liste yenileme: REFRESH_LABELS sirasi (varsayilan: haftada bir). */
     var refreshMode: Int
         get() = prefs.getInt("refreshMode", 3)

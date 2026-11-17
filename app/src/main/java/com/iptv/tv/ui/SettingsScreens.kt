@@ -62,7 +62,19 @@ fun SettingsScreen(vm: AppViewModel) {
         OptionItem(ListRow("Çalışmayan kanalları gizle", sub = if (vm.hideDead) "Açık" else "Kapalı")) { vm.toggleHideDead() }
     )
 
-    val items: List<OptionItem> = listOf(
+    // Guncelleme satiri: yeni surum varsa listenin en ustunde, yoksa en altta
+    val updateRow = OptionItem(
+            ListRow(
+                if (vm.updateInfo != null) "⬆ Güncelle" else "Güncellemeleri denetle",
+                sub = vm.updateStatus
+                    ?: vm.updateInfo?.let { "Yeni sürüm: v${it.version} · yüklemek için OK" }
+                    ?: "otomatik: günde bir",
+                badge = if (vm.updateInfo != null) "●" else ""
+            )
+        ) { if (vm.updateInfo != null) vm.startUpdate() else vm.checkUpdate(manual = true) }
+    val updateTop = vm.updateInfo != null
+
+    val items: List<OptionItem> = (if (updateTop) listOf(updateRow) else emptyList()) + listOf(
         OptionItem(ListRow("Kaynak ekle (M3U / Xtream)")) { vm.editSourceId = null; vm.openScreen(Screen.ADD_SOURCE) },
         OptionItem(ListRow("Aktif kaynağı düzenle", sub = "sunucu / kullanıcı adı / şifre")) {
             if (src == null) vm.toast("Kaynak yok") else { vm.editSourceId = src.id; vm.openScreen(Screen.ADD_SOURCE) }
@@ -103,7 +115,7 @@ fun SettingsScreen(vm: AppViewModel) {
         },
         OptionItem(ListRow("Uygulamayı yeniden başlat")) { vm.restartApp() },
         OptionItem(ListRow("Uygulama sürümü", sub = "v$appVersion")) { vm.toast("dedplay v$appVersion") }
-    )
+    ) + (if (updateTop) emptyList() else listOf(updateRow))
     val rows = items.map { it.row }
 
     Box(
