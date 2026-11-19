@@ -55,8 +55,8 @@ class MainActivity : ComponentActivity() {
             KeyEvent.KEYCODE_POWER -> return super.dispatchKeyEvent(event)
         }
         val fr = KeyFocus.current ?: return super.dispatchKeyEvent(event)
-        if (runCatching { fr.requestFocus() }.isFailure) return super.dispatchKeyEvent(event)
-        return true
+        runCatching { fr.requestFocus() }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onStop() {
