@@ -188,25 +188,30 @@ fun MultiScreen(vm: AppViewModel) {
 
     fun openPicker() {
         val cur = tiles.getOrNull(focus)
-        vm.beginMultiPick(cur?.sourceId ?: vm.activeId)
-        pickContent = when (cur?.item?.kind) {
+        // Bos karoda secilecek kanal yok, islem yapma
+        if (cur == null || cur.item.id.isEmpty()) {
+            vm.toast("Bu karoda kanal yok. Once kaynak secin.")
+            return
+        }
+        vm.beginMultiPick(cur.sourceId)
+        pickContent = when (cur.item.kind) {
             "movie" -> "film"
             "series" -> "dizi"
             else -> "canli"
         }
         // Ilk acishda secili kanal varsa kanallara, yoksa gruplara git
-        pickMode = if (cur != null && cur.item.id.isNotEmpty()) PickMode.CHANNELS else PickMode.GROUPS
+        pickMode = if (cur.item.id.isNotEmpty()) PickMode.CHANNELS else PickMode.GROUPS
         pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
         // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
         val groups = vm.multiPickGroups(pickContent)
-        if (cur != null && cur.item.id.isNotEmpty()) {
+        if (cur.item.id.isNotEmpty()) {
             // Mevcut grubu bul
             pickGroupIdx = groups.indexOfFirst { it == cur.item.group }.coerceIn(0, groups.size - 1)
         } else {
             pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
         }
         val list = vm.multiPickItems(pickContent, groups.getOrNull(pickGroupIdx) ?: FAV_GROUP)
-        if (cur != null && cur.item.id.isNotEmpty()) {
+        if (cur.item.id.isNotEmpty()) {
             // Mevcut kanali listede bul
             pickChanIdx = list.indexOfFirst { it.id == cur.item.id }.coerceIn(0, list.size - 1)
         } else {
