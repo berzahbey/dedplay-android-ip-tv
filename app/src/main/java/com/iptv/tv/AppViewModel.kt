@@ -1133,7 +1133,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun stopRecording(id: String) = Recorder.stop(getApplication(), id)
 
     // ---------- Coklu ekran ----------
-    var multiLayout by mutableIntStateOf(2)
+    var multiLayout by mutableIntStateOf(store.loadMultiLayout())
 
     /** Coklu ekran kartlari: her karo kendi kaynagini ve kanalini tutar.
      *  AppViewModel'de durdugu icin ekran gecislerinde (MULTI<->LIVE) kaybolmaz. */
@@ -1305,6 +1305,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setMultiTile(index: Int, ch: MultiChannel?) {
         if (index in multiTiles.indices) multiTiles[index] = ch
         store.saveMultiTiles(multiTiles.toList())
+    }
+
+    fun saveMultiLayout(layout: Int) {
+        store.saveMultiLayout(layout)
     }
 
     /** Coklu ekrandan secilen karoyu tam ekranda ac (gerekirse kaynagini da degistirir). */

@@ -316,4 +316,12 @@ class Store(private val ctx: Context) {
             MultiChannel(o.getString("sourceId"), item)
         }
     }
+
+    fun saveMultiLayout(layout: Int) {
+        prefs.edit().putInt("multiLayout", layout).apply()
+    }
+
+    fun loadMultiLayout(): Int {
+        return prefs.getInt("multiLayout", 2)
+    }
 }

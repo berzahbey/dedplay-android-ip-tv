@@ -236,6 +236,7 @@ fun MultiScreen(vm: AppViewModel) {
             0 -> {
                 layout = if (layout == 2) 4 else 2
                 vm.multiLayout = layout
+                vm.saveMultiLayout(layout)
                 if (focus >= layout) focus = 0
             }
             1 -> {
@@ -550,6 +551,7 @@ fun MultiScreen(vm: AppViewModel) {
                 BarChip(if (layout == 2) "⊞ 4'lü ekran" else "⊟ 2'li ekran") {
                     layout = if (layout == 2) 4 else 2
                     vm.multiLayout = layout
+                    vm.saveMultiLayout(layout)
                     if (focus >= layout) focus = 0
                 }
                 BarChip("OK: Kanal değiştir") { openPicker() }
