@@ -322,8 +322,7 @@ fun LiveScreen(vm: AppViewModel) {
                     }
                 }
             )
-            .focusRequester(fr)
-            .focusable()
+            .then(if (isTv) Modifier.focusRequester(fr).focusable() else Modifier)
     ) {
         PlayerSurface(vm.player, vm.resizeMode)
 

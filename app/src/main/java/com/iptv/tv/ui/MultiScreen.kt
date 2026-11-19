@@ -193,7 +193,7 @@ fun MultiScreen(vm: AppViewModel) {
             "series" -> "dizi"
             else -> "canli"
         }
-        pickMode = PickMode.CHANNELS
+        pickMode = PickMode.TOP
         pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
         // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
         val groups = vm.multiPickGroups(pickContent)
@@ -203,7 +203,19 @@ fun MultiScreen(vm: AppViewModel) {
         picker = true
     }
 
-    BackHandler { if (picker) picker = false else vm.openScreen(Screen.LIVE) }
+    BackHandler {
+        if (picker) {
+            when (pickMode) {
+                PickMode.CHANNELS -> pickMode = PickMode.GROUPS
+                PickMode.GROUPS -> pickMode = PickMode.TOP
+                PickMode.SOURCES -> pickMode = PickMode.TOP
+                PickMode.SETTINGS -> pickMode = PickMode.GROUPS
+                PickMode.TOP -> picker = false
+            }
+        } else {
+            vm.openScreen(Screen.LIVE)
+        }
+    }
 
     fun pickAt(i: Int) {
         pickIdx = i
@@ -235,11 +247,19 @@ fun MultiScreen(vm: AppViewModel) {
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { activity++; false }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) { awaitPointerEvent(PointerEventPass.Initial); activity++ }
+            // Dokunmatik: sağa/sola sürükle ile karolar arasında geçiş
+            .touchGestures(
+                onSwipeRight = {
+                    if (layout == 2) focus = (focus + 1).coerceIn(0, 1)
+                    else focus = (focus + 1) % 4
+                },
+                onSwipeLeft = {
+                    if (layout == 2) focus = (focus - 1).coerceAtLeast(0)
+                    else focus = (focus - 1 + 4) % 4
                 }
-            }
+            )
+            // pointerInput kaldirildi: dokunmatik ciharlarda (telefon/tablet) carpan
+            // olaylari engelleme; touchGestures (Tile) kendi eventi yakalasin.
             .tvKeys(
                 onUp = {
                     if (picker) {
@@ -326,8 +346,7 @@ fun MultiScreen(vm: AppViewModel) {
                 onChannelUp = { true },
                 onChannelDown = { true }
             )
-            .focusRequester(fr)
-            .focusable()
+            .then(if (isTv) Modifier.focusRequester(fr).focusable() else Modifier)
     ) {
         val rows = if (layout == 2) listOf(listOf(0, 1)) else listOf(listOf(0, 1), listOf(2, 3))
         Column(Modifier.fillMaxSize()) {

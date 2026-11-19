@@ -12,6 +12,8 @@ Bu uygulama sadece bir **oynatıcıdır**. İçerik, sizin kendi (yasal) M3U lis
 
 Bu bağlantı her zaman en son sürümü indirir; telefonda, tablette ve araç kutusunda tarayıcıdan açılabilir.
 
+**Gizlilik Politikası:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
+
 ---
 
 ## Hangi cihazlarda çalışır?

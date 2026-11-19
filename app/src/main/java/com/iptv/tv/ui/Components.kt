@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -291,23 +292,27 @@ fun Modifier.tvKeys(
     onLastChannel: () -> Boolean = { false },
     onPlayPause: () -> Boolean = { false }
 ): Modifier {
-    val longDone = remember { booleanArrayOf(false) }
+    // Uzun-bas (long press) icin sure tabanli takip: cihazlara gore tekrar hizi degisir,
+    // bunu sureye gore yapmak daha guvenlidir.
+    val longPressStart = remember { mutableStateOf(0L) }
+    val LONG_PRESS_MS = 600L
     return this.onKeyEvent { ev ->
         val k = ev.key
         if (isOk(k)) {
             when (ev.type) {
                 KeyEventType.KeyDown -> {
                     if (ev.nativeKeyEvent.repeatCount == 0) {
-                        longDone[0] = false
-                    } else if (!longDone[0]) {
-                        longDone[0] = true
+                        longPressStart.value = System.currentTimeMillis()
+                    } else if (longPressStart.value > 0L
+                        && System.currentTimeMillis() - longPressStart.value >= LONG_PRESS_MS) {
+                        longPressStart.value = 0L
                         onLongOk()
                     }
                     true
                 }
                 KeyEventType.KeyUp -> {
-                    if (!longDone[0]) onOk()
-                    longDone[0] = false
+                    if (longPressStart.value == 0L) onOk()
+                    longPressStart.value = 0L
                     true
                 }
                 else -> false
