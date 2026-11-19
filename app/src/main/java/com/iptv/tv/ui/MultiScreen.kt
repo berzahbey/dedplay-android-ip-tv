@@ -259,6 +259,8 @@ fun MultiScreen(vm: AppViewModel) {
                     else focus = (focus - 1 + 4) % 4
                 }
             )
+            // focusable MUST come before tvKeys (onKeyEvent requires focusable node)
+            .then(Modifier.focusRequester(fr).focusable())
             // pointerInput kaldirildi: dokunmatik ciharlarda (telefon/tablet) carpan
             // olaylari engelleme; touchGestures (Tile) kendi eventi yakalasin.
             .tvKeys(
@@ -347,7 +349,6 @@ fun MultiScreen(vm: AppViewModel) {
                 onChannelUp = { true },
                 onChannelDown = { true }
             )
-            .then(Modifier.focusRequester(fr).focusable())
     ) {
         val rows = if (layout == 2) listOf(listOf(0, 1)) else listOf(listOf(0, 1), listOf(2, 3))
         Column(Modifier.fillMaxSize()) {

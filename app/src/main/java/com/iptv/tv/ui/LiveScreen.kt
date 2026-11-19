@@ -198,6 +198,8 @@ fun LiveScreen(vm: AppViewModel) {
                     while (true) { awaitPointerEvent(PointerEventPass.Initial); touchTick++ }
                 }
             }
+            // focusable MUST come before tvKeys (onKeyEvent requires focusable node)
+            .then(Modifier.focusRequester(fr).focusable())
             .tvKeys(
                 onUp = {
                     when (panel) {
@@ -322,7 +324,6 @@ fun LiveScreen(vm: AppViewModel) {
                     }
                 }
             )
-            .then(Modifier.focusRequester(fr).focusable())
     ) {
         PlayerSurface(vm.player, vm.resizeMode)
 
