@@ -311,7 +311,7 @@ fun Modifier.tvKeys(
                     true
                 }
                 KeyEventType.KeyUp -> {
-                    if (longPressStart.value == 0L) onOk()
+                    if (longPressStart.value > 0L) onOk()
                     longPressStart.value = 0L
                     true
                 }
