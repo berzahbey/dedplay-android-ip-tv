@@ -193,26 +193,27 @@ fun MultiScreen(vm: AppViewModel) {
             vm.toast("Bu karoda kanal yok. Once kaynak secin.")
             return
         }
-        vm.beginMultiPick(cur.sourceId)
-        pickContent = when (cur.item.kind) {
-            "movie" -> "film"
-            "series" -> "dizi"
-            else -> "canli"
+        try {
+            vm.beginMultiPick(cur.sourceId)
+            pickContent = when (cur.item.kind) {
+                "movie" -> "film"
+                "series" -> "dizi"
+                else -> "canli"
+            }
+            // Ilk acishda secili kanal varsa kanallara, yoksa gruplara git
+            pickMode = if (cur.item.id.isNotEmpty()) PickMode.CHANNELS else PickMode.GROUPS
+            pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
+            // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
+            val groups = vm.multiPickGroups(pickContent)
+            pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
+            val list = vm.multiPickItems(pickContent, groups.getOrNull(pickGroupIdx) ?: FAV_GROUP)
+            // Mevcut kanali listede bul, yoksa ilk kanala sec
+            pickChanIdx = list.indexOfFirst { it.id == cur.item.id }.coerceIn(0, (list.size - 1).coerceAtLeast(0))
+            picker = true
+        } catch (e: Exception) {
+            vm.toast("Kaydirma hatasi: ${e.message}")
+            picker = false
         }
-        // Ilk acishda secili kanal varsa kanallara, yoksa gruplara git
-        pickMode = if (cur.item.id.isNotEmpty()) PickMode.CHANNELS else PickMode.GROUPS
-        pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
-        // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
-        val groups = vm.multiPickGroups(pickContent)
-        pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
-        val list = vm.multiPickItems(pickContent, groups.getOrNull(pickGroupIdx) ?: FAV_GROUP)
-        if (cur.item.id.isNotEmpty()) {
-            // Mevcut kanali listede bul
-            pickChanIdx = list.indexOfFirst { it.id == cur.item.id }.coerceIn(0, list.size - 1)
-        } else {
-            pickChanIdx = pickChanIdx.coerceIn(0, (list.size - 1).coerceAtLeast(0))
-        }
-        picker = true
     }
 
     BackHandler {
