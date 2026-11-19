@@ -204,12 +204,7 @@ fun MultiScreen(vm: AppViewModel) {
         pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
         // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
         val groups = vm.multiPickGroups(pickContent)
-        if (cur.item.id.isNotEmpty()) {
-            // Mevcut grubu bul
-            pickGroupIdx = groups.indexOfFirst { it == cur.item.group }.coerceIn(0, groups.size - 1)
-        } else {
-            pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
-        }
+        pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
         val list = vm.multiPickItems(pickContent, groups.getOrNull(pickGroupIdx) ?: FAV_GROUP)
         if (cur.item.id.isNotEmpty()) {
             // Mevcut kanali listede bul
