@@ -188,8 +188,8 @@ fun MultiScreen(vm: AppViewModel) {
 
     fun openPicker() {
         val cur = tiles.getOrNull(focus)
-        // Bos karoda secilecek kanal yok, islem yapma
-        if (cur == null || cur.item.id.isEmpty()) {
+        // Bos karoda veya kanali yoksa secilecek yok
+        if (cur == null || cur.item == null || cur.item.id.isEmpty()) {
             vm.toast("Bu karoda kanal yok. Once kaynak secin.")
             return
         }
