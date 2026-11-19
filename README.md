@@ -37,7 +37,7 @@ En az **Android 6.0** gerekir.
 - **Canlı TV:** gruplar, ★ favoriler, grup gizleme, kanal numarasıyla geçiş, önceki kanala dönüş
 - **Yayın akışı (EPG):** şimdiki/sıradaki program ve ilerleme çubuğu (Xtream); kanal grubuna göre **saat farkı düzeltmesi** (örn. Türkiye kanalları Hollanda'dan izlenirken)
 - **Kayıt:** izlenen kanalı kaydet, şu anki programı bitene kadar kaydet, yayın akışından **ileri saate kayıt planla**; TV hafızasına veya **USB belleğe**; uygulama arka plandayken de devam eder
-- **Çoklu ekran:** 2'li veya 4'lü; ses seçili karodan gelir
+- **Çoklu ekran:** 2'li veya 4'lü; her karo farklı M3U / Xtream kaynağından seçilebilir; ses seçili karodan gelir
 - **Filmler ve diziler** (Xtream), sezon/bölüm listesi
 - **Arama:** kanal, film ve dizi adında
 - **Ses ve altyazı seçimi;** varsayılan ses dili Türkçe

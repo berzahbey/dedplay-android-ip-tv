@@ -144,7 +144,7 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
                         PanelHeader(group?.uppercase() ?: "")
                         val rows = remember(items) { items.map { ListRow(it.name, logo = it.logo) } }
                         TvList(
-                            rows, if (col == 1) iSel else -1, Modifier.weight(1f), rowHeight = 64,
+                            rows, if (col == 1) iSel else -1, Modifier.weight(1f), rowHeight = 64.dp,
                             emptyText = if (vm.episodesLoading) "Bölümler yükleniyor…" else "",
                             onClick = { i -> col = 1; iIdx = i; openAt(i) }
                         )

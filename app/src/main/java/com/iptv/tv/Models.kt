@@ -30,6 +30,12 @@ data class Library(
     val updated: Long
 ) : Serializable
 
+/**
+ * Coklu ekran karosundaki kanal. [sourceId] sayesinde her karo farkli bir
+ * M3U / Xtream kaynagindan beslenebilir.
+ */
+data class MultiChannel(val sourceId: String, val item: Item)
+
 data class Episode(val id: String, val title: String, val season: Int, val url: String)
 
 /** Yayin akisi (EPG) kaydi. Zamanlar milisaniye. */

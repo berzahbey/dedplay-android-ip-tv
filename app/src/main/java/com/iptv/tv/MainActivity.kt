@@ -27,6 +27,7 @@ import com.iptv.tv.ui.BrowseScreen
 import com.iptv.tv.ui.LiveScreen
 import com.iptv.tv.ui.ManageGroupsScreen
 import com.iptv.tv.ui.MultiScreen
+import com.iptv.tv.ui.PanelBg
 import com.iptv.tv.ui.RecordingsScreen
 import com.iptv.tv.ui.PlayerScreen
 import com.iptv.tv.ui.SearchScreen
@@ -102,7 +103,7 @@ fun AppRoot(vm: AppViewModel) {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 48.dp)
-                    .background(Color(0xF51E2228), RoundedCornerShape(10.dp))
+                    .background(PanelBg, RoundedCornerShape(10.dp))
                     .padding(horizontal = 22.dp, vertical = 12.dp)
             )
         }

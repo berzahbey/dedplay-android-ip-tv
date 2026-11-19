@@ -88,6 +88,7 @@ fun SettingsScreen(vm: AppViewModel) {
     ) + scanItems + listOf(
         OptionItem(ListRow("Yayın formatı (Xtream)", sub = vm.streamExt)) { vm.toggleExt() },
         OptionItem(ListRow("Görüntü oranı", sub = RESIZE_LABELS[vm.resizeMode])) { vm.cycleResize() },
+        OptionItem(ListRow("Tema rengi", sub = ThemeState.current.name)) { vm.cycleTheme() },
         OptionItem(ListRow("Tampon (arabellek)", sub = BUFFER_LABELS[vm.bufferMode])) { vm.cycleBuffer() },
         OptionItem(ListRow("Açılışta", sub = START_LABELS[vm.startMode])) { vm.cycleStartMode() },
         OptionItem(ListRow("Geri tuşu", sub = BACK_LABELS[vm.backExit])) { vm.cycleBackExit() },

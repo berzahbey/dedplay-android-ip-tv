@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -30,6 +31,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -149,6 +151,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var toastJob: Job? = null
     private var watchJob: Job? = null
     private var sleepJob: Job? = null
+    private var refreshJob: Job? = null
+    private var accountJob: Job? = null
+    private var episodesJob: Job? = null
     private var lastFrames = -1
     private var failCount = 0
     /** Cihaz bu kanalin goruntusunu cozemiyor (orn. tablette 4K HEVC): yeniden deneme yapma. */
@@ -199,6 +204,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        com.iptv.tv.ui.ThemeState.index = store.theme.coerceIn(0, com.iptv.tv.ui.THEMES.size - 1)
         Recorder.load(app)
         Recorder.ensureService(app)
         setupMediaSession()
@@ -405,6 +411,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setActive(id: String) {
         activeId = id
         store.activeSourceId = id
+        refreshJob?.cancel()
+        accountJob?.cancel()
+        loading = false
+        account = null
         stopPlayback()
         currentChannel = null
         previousChannel = null
@@ -441,18 +451,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Liste yukleme ----------
     fun refresh() {
         val src = activeSource() ?: return
-        viewModelScope.launch {
+        // Ayni anda iki indirme olmasin ve eski kaynagin yaniti yeni kaynagi ezmesin
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             loading = true
             loadError = null
             try {
                 val lib = withContext(Dispatchers.IO) {
                     Repository.load(src, streamExt).also { store.saveLibrary(src.id, it) }
                 }
-                updateLibrary(lib)
+                if (activeId == src.id) updateLibrary(lib)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
-                loadError = "Liste yüklenemedi: ${e.message ?: e.javaClass.simpleName}"
+                if (activeId == src.id) loadError = "Liste yüklenemedi: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                if (activeId == src.id) loading = false
             }
-            loading = false
         }
     }
 
@@ -569,10 +584,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Oynatma ----------
-    private fun liveUrl(item: Item): String =
-        if (activeSource()?.type == "xtream" && item.kind == "live")
-            item.url.substringBeforeLast('.') + "." + streamExt
-        else item.url
+    private fun liveUrl(item: Item): String = liveUrlOf(activeSource()?.id ?: activeId, item)
 
     private fun isLiveActive() = screen == Screen.LIVE && playingUrl.isNotEmpty()
 
@@ -704,7 +716,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             s != Screen.PLAYER -> stopPlayback()
         }
-        if (s != Screen.SERIES) episodes = null
+        if (s != Screen.SERIES) closeEpisodes()
         screen = s
     }
 
@@ -1018,8 +1030,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadAccount() {
         val src = activeSource() ?: return
         if (src.type != "xtream") { account = null; return }
-        viewModelScope.launch {
-            account = runCatching { withContext(Dispatchers.IO) { Repository.accountInfo(src) } }.getOrNull()
+        // Kaynak degisirse eski kaynagin hesap bilgisi gelmesin
+        accountJob?.cancel()
+        accountJob = viewModelScope.launch {
+            val info = runCatching { withContext(Dispatchers.IO) { Repository.accountInfo(src) } }.getOrNull()
+            if (activeId == src.id) account = info
         }
     }
 
@@ -1118,7 +1133,129 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun stopRecording(id: String) = Recorder.stop(getApplication(), id)
 
     // ---------- Coklu ekran ----------
-    var multiLayout by mutableIntStateOf(4)
+    var multiLayout by mutableIntStateOf(2)
+
+    /** Coklu ekran kartlari: her karo kendi kaynagini ve kanalini tutar.
+     *  AppViewModel'de durdugu icin ekran gecislerinde (MULTI<->LIVE) kaybolmaz. */
+    val multiTiles = mutableStateListOf<MultiChannel?>()
+
+    /** Coklu ekran secicisinde o an gozatilan kaynak (her karo farkli kaynaktan olabilir). */
+    var multiPickSourceId by mutableStateOf("")
+        private set
+
+    /** Secili kaynagin listesi yukleniyor mu? */
+    var multiPickLoading by mutableStateOf(false)
+        private set
+
+    /*
+     * Aktif kaynak disinda yalnizca tek bir kaynagin kutuphanesi bellekte tutulur;
+     * boylece cok sayida kaynak eklense de coklu ekran bellegi sismez.
+     */
+    private var multiExtraSourceId: String? = null
+    private var multiExtraLib by mutableStateOf<Library?>(null)
+    private var multiPickJob: Job? = null
+
+    fun sourceName(id: String): String = sources.firstOrNull { it.id == id }?.name ?: "-"
+
+    /** Coklu ekran karosu icin yayin adresi: kanalin geldigi kaynagin turune gore. */
+    fun liveUrlOf(sourceId: String, item: Item): String =
+        if (sources.firstOrNull { it.id == sourceId }?.type == "xtream" && item.kind == "live")
+            item.url.substringBeforeLast('.') + "." + streamExt
+        else item.url
+
+    private fun multiPickLibrary(): Library? =
+        if (multiPickSourceId == activeId) library
+        else if (multiExtraSourceId == multiPickSourceId) multiExtraLib
+        else null
+
+    /** Secicide gozatilacak kaynagi ayarlar; listesi yoksa onbellege alir / indirir. */
+    fun beginMultiPick(sourceId: String) {
+        val src = sources.firstOrNull { it.id == sourceId } ?: activeSource() ?: return
+        val same = src.id == multiPickSourceId
+        if (same && (src.id == activeId || multiExtraSourceId == src.id || multiPickLoading)) return
+        multiPickSourceId = src.id
+        multiPickJob?.cancel()
+        multiPickLoading = false
+        if (src.id == activeId) return
+        if (multiExtraSourceId == src.id && multiExtraLib != null) return
+        // Onceki ekstra kaynagin listesini bellekten dusur
+        multiExtraSourceId = null
+        multiExtraLib = null
+        multiPickLoading = true
+        multiPickJob = viewModelScope.launch {
+            try {
+                val lib = withContext(Dispatchers.IO) {
+                    store.loadLibrary(src.id)
+                        ?: Repository.load(src, streamExt).also { store.saveLibrary(src.id, it) }
+                }
+                if (multiPickSourceId != src.id) return@launch
+                multiExtraSourceId = src.id
+                multiExtraLib = lib
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                if (multiPickSourceId == src.id) {
+                    toast("Kaynak listesi alınamadı: ${e.message ?: e.javaClass.simpleName}")
+                }
+            } finally {
+                if (multiPickSourceId == src.id) multiPickLoading = false
+            }
+        }
+    }
+
+    /** Secicide liste yukleniyor mu? (aktif kaynagin ilk yuklemesi dahil) */
+    fun multiPickBusy(): Boolean =
+        multiPickLoading || (multiPickSourceId == activeId && library == null && loading)
+
+    /** Secicideki kaynakta, gizli gruplar haric, secilen icerik turune gore favoriler + tum ogeler + gruplar.
+     *  contentType: "canli", "film" veya "dizi" */
+    fun multiPickGroups(contentType: String): List<String> {
+        multiPickSourceId; multiExtraLib; hidden
+        val lib = multiPickLibrary() ?: return listOf(FAV_GROUP, ALL_GROUP)
+        val (items, hiddenPrefix) = when (contentType) {
+            "film" -> lib.movies to "movie"
+            "dizi" -> lib.series to "series"
+            else -> lib.live to "live"
+        }
+        val groups = items.asSequence()
+            .map { it.group }
+            .filter { "$hiddenPrefix:$it" !in hidden }
+            .distinct()
+            .toList()
+        return listOf(FAV_GROUP, ALL_GROUP) + groups
+    }
+
+    /** Secicideki kaynak + grup icin ogeler (gizli / calismayan kanallar uygulanir).
+     *  contentType: "canli", "film" veya "dizi" */
+    fun multiPickItems(contentType: String, group: String): List<Item> {
+        multiPickSourceId; multiExtraLib; favorites; hidden; hiddenCh; deadCh; hideDead
+        val lib = multiPickLibrary() ?: return emptyList()
+        val sourceId = multiPickSourceId
+        val p = "$sourceId|"
+        val hid = hidden
+        val (items, hiddenPrefix) = when (contentType) {
+            "film" -> lib.movies to "movie"
+            "dizi" -> lib.series to "series"
+            else -> lib.live to "live"
+        }
+        val pool = items.filter { "$hiddenPrefix:${it.group}" !in hid }
+        val base = when (group) {
+            ALL_GROUP -> pool
+            FAV_GROUP -> pool.filter { "$p${it.id}" in favorites }
+            else -> pool.filter { it.group == group }
+        }
+        val hc = hiddenCh
+        val dc = if (hideDead) deadCh else emptySet()
+        if (hc.none { it.startsWith(p) } && dc.none { it.startsWith(p) }) return base
+        return base.filter { "$p${it.id}" !in hc && "$p${it.id}" !in dc }
+    }
+
+    fun cycleMultiPickSource() {
+        if (sources.size < 2) { toast("Başka kaynak yok"); return }
+        val i = sources.indexOfFirst { it.id == multiPickSourceId }
+        val next = sources[(i + 1) % sources.size]
+        beginMultiPick(next.id)
+    }
 
     /** Coklu ekran karosu icin ayri oynatici (kucuk tampon). Cagiran release etmeli. */
     fun newTilePlayer(): ExoPlayer {
@@ -1139,45 +1276,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .build()
     }
 
-    fun liveUrlOf(item: Item): String = liveUrl(item)
-
-    /** Coklu ekran baslangici: izlenen kanal + favoriler (yoksa ayni gruptakiler). */
-    fun multiInitial(): List<Item?> {
-        val out = ArrayList<Item?>()
-        currentChannel?.let { out.add(it) }
+    /** Coklu ekrana ilk giriste 4 karonu doldur. Sonraki girislerde degismez (her karo kendi kaynagini korur). */
+    fun multiEnsureInitial() {
+        if (multiTiles.isNotEmpty()) return
+        val out = ArrayList<MultiChannel?>()
+        val srcId = activeSource()?.id ?: activeId
+        currentChannel?.let { out.add(MultiChannel(srcId, it)) }
         val pool = itemsIn("live", FAV_GROUP).ifEmpty { itemsIn("live", liveGroup) }
         for (it in pool) {
             if (out.size >= 4) break
-            if (out.none { o -> o?.id == it.id }) out.add(it)
+            if (out.none { o -> o?.item?.id == it.id }) out.add(MultiChannel(srcId, it))
         }
         while (out.size < 4) out.add(null)
-        return out
+        multiTiles.addAll(out)
     }
 
-    /** Coklu ekrandan secilen karoyu tam ekranda ac. */
-    fun fullscreenFromMulti(item: Item?) {
+    /** Coklu ekrandan secilen karoyu tam ekranda ac (gerekirse kaynagini da degistirir). */
+    fun fullscreenFromMulti(ch: MultiChannel?) {
+        val item = ch?.item
+        if (item == null) { screen = Screen.LIVE; return }
+        if (ch.sourceId != activeId && sources.any { it.id == ch.sourceId }) setActive(ch.sourceId)
         screen = Screen.LIVE
-        if (item != null) playLive(item)
+        liveGroup = item.group
+        playLive(item)
     }
 
     // ---------- Diziler ----------
+    private var episodesSeriesId: String? = null
+
     fun openSeries(item: Item) {
         if (item.url.isNotEmpty()) { playVod(item.name, item.url, Screen.SERIES); return }
         val src = activeSource() ?: return
+        // Onceki dizinin bolumleri yeni dizi yuklenirken ekranda kalmasin
+        episodesJob?.cancel()
+        episodesSeriesId = item.id
+        episodes = null
         episodesLoading = true
         episodesTitle = item.name
-        viewModelScope.launch {
+        episodesJob = viewModelScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) { Repository.seriesEpisodes(src, item.id) }
+                if (episodesSeriesId != item.id) return@launch
                 if (list.isEmpty()) toast("Bölüm bulunamadı") else episodes = list
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
-                toast("Bölümler alınamadı: ${e.message}")
+                if (episodesSeriesId == item.id) toast("Bölümler alınamadı: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                if (episodesSeriesId == item.id) episodesLoading = false
             }
-            episodesLoading = false
         }
     }
 
-    fun closeEpisodes() { episodes = null }
+    fun closeEpisodes() {
+        episodesJob?.cancel()
+        episodesJob = null
+        episodesSeriesId = null
+        episodesLoading = false
+        episodes = null
+    }
 
     // ---------- Ayarlar ----------
     fun toggleExt() {
@@ -1221,6 +1378,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             mins < 24 * 60 -> "${mins / 60} saat önce"
             else -> "${mins / (24 * 60)} gün önce"
         }
+    }
+
+    fun cycleTheme() {
+        val n = (com.iptv.tv.ui.ThemeState.index + 1) % com.iptv.tv.ui.THEMES.size
+        com.iptv.tv.ui.ThemeState.index = n
+        store.theme = n
+        toast("Tema: ${com.iptv.tv.ui.THEMES[n].name}")
     }
 
     fun cycleBackExit() {

@@ -24,6 +24,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -60,14 +62,57 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 
 // ---- Renkler (Siyah / Koyu Tema) ----
-val PanelBg = Color(0xF4121418)
-val RowBg = Color(0xFF1E2228)
-val RowSelected = Color(0xFF323842)
-val Accent = Color(0xFFE2E8F0)
-val ScreenBg = Color(0xFF0F1115)
+/** Tema: paneller, satirlar, vurgu rengi ve ekran arka plani. */
+data class AppTheme(
+    val name: String,
+    val panel: Color,
+    val row: Color,
+    val rowSelected: Color,
+    val accent: Color,
+    val screen: Color
+)
+
+val THEMES = listOf(
+    AppTheme("Gri", Color(0xF4121418), Color(0xFF1E2228), Color(0xFF323842), Color(0xFFE2E8F0), Color(0xFF0F1115)),
+    AppTheme("Mavi", Color(0xF40B1730), Color(0xFF13264A), Color(0xFF1E3A70), Color(0xFF8EC5FF), Color(0xFF07101F)),
+    AppTheme("Yeşil", Color(0xF40C1A14), Color(0xFF133024), Color(0xFF1E4A37), Color(0xFF6EE7B7), Color(0xFF07120D)),
+    AppTheme("Mor", Color(0xF4170F26), Color(0xFF261A3D), Color(0xFF3A2860), Color(0xFFC4B5FD), Color(0xFF0F0A1A)),
+    AppTheme("Turuncu", Color(0xF41C130B), Color(0xFF2E2014), Color(0xFF4A321C), Color(0xFFFDBA74), Color(0xFF140D07)),
+    AppTheme("Kırmızı", Color(0xF41E0D0F), Color(0xFF331619), Color(0xFF552226), Color(0xFFFCA5A5), Color(0xFF140708))
+)
+
+/** Secili tema (degisince tum ekranlar aninda yeniden cizilir). */
+object ThemeState {
+    var index by mutableIntStateOf(0)
+    val current: AppTheme get() = THEMES.getOrElse(index) { THEMES[0] }
+}
+
+val PanelBg: Color get() = ThemeState.current.panel
+val RowBg: Color get() = ThemeState.current.row
+val RowSelected: Color get() = ThemeState.current.rowSelected
+val Accent: Color get() = ThemeState.current.accent
+val ScreenBg: Color get() = ThemeState.current.screen
 
 /** Listede gosterilecek tek satir. */
 data class ListRow(val title: String, val sub: String = "", val logo: String = "", val badge: String = "")
+
+/** Cihaz türü: TV, Tablet veya Telefon. */
+enum class DeviceType { TV, TABLET, PHONE }
+
+/** Cihaz türünü döndürür (UI modu + ekran genişliğine göre). */
+@Composable
+fun rememberDeviceType(): DeviceType {
+    val ctx = LocalContext.current
+    val config = LocalConfiguration.current
+    val uiMode = (ctx.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)?.currentModeType
+    return remember {
+        when {
+            uiMode == Configuration.UI_MODE_TYPE_TELEVISION -> DeviceType.TV
+            config.screenWidthDp >= 600 -> DeviceType.TABLET
+            else -> DeviceType.PHONE
+        }
+    }
+}
 
 fun isOk(k: Key) = k == Key.DirectionCenter || k == Key.Enter || k == Key.NumPadEnter
 
@@ -174,6 +219,52 @@ fun rememberIsTv(): Boolean {
     }
 }
 
+/** Panel genisliği: cihaza göre optimize edilmiş (MultiScreen için). */
+@Composable
+fun multiPanelWidth(widthDp: Int): Dp {
+    val screen = LocalConfiguration.current.screenWidthDp
+    val device = rememberDeviceType()
+    val maxW = when (device) {
+        DeviceType.TV -> screen * 0.32f
+        DeviceType.TABLET -> screen * 0.55f
+        DeviceType.PHONE -> screen * 0.92f
+    }
+    return minOf(widthDp.toFloat(), maxW).toInt().dp
+}
+
+/** Yazı boyutu: cihaza göre ölçeklendirilir. */
+@Composable
+fun txtSize(baseSp: Float): Float {
+    val device = rememberDeviceType()
+    return when (device) {
+        DeviceType.TV -> baseSp * 1.1f
+        DeviceType.TABLET -> baseSp * 1.1f
+        DeviceType.PHONE -> baseSp
+    }
+}
+
+/** Satır yüksekliği: cihaza göre ölçeklendirilir. */
+@Composable
+fun rowHeightDp(baseDp: Int): Dp {
+    val device = rememberDeviceType()
+    return when (device) {
+        DeviceType.TV -> (baseDp * 1.1f).toInt().dp
+        DeviceType.TABLET -> (baseDp * 1.1f).toInt().dp
+        DeviceType.PHONE -> baseDp.dp
+    }
+}
+
+/** Kenar boşluğu: cihaza göre ölçeklendirilir. */
+@Composable
+fun padSizeDp(baseDp: Int): Dp {
+    val device = rememberDeviceType()
+    return when (device) {
+        DeviceType.TV -> (baseDp * 1.1f).toInt().dp
+        DeviceType.TABLET -> (baseDp * 1.2f).toInt().dp
+        DeviceType.PHONE -> baseDp.dp
+    }
+}
+
 /** Ayarlardaki goruntu orani -> PlayerView resize modu. */
 fun resizeModeOf(mode: Int): Int = when (mode) {
     1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
@@ -246,7 +337,9 @@ fun TvList(
     rows: List<ListRow>,
     selected: Int,
     modifier: Modifier = Modifier,
-    rowHeight: Int = 44,
+    rowHeight: Dp = 44.dp,
+    textSize: Float = 16f,
+    subSize: Float = 13f,
     emptyText: String = "",
     onClick: ((Int) -> Unit)? = null,
     onLongClick: ((Int) -> Unit)? = null
@@ -267,7 +360,7 @@ fun TvList(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(rowHeight.dp)
+                    .height(rowHeight)
                     .background(if (sel) RowSelected else RowBg, RoundedCornerShape(6.dp))
                     .then(if (sel) Modifier.border(2.dp, Accent, RoundedCornerShape(6.dp)) else Modifier)
                     .then(
@@ -287,24 +380,24 @@ fun TvList(
                         model = r.logo,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.size((rowHeight - 10).dp)
+                        modifier = Modifier.size((rowHeight - 10.dp))
                     )
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(
                     r.title,
                     color = if (sel) Color.White else Accent,
-                    fontSize = 16.sp,
+                    fontSize = textSize.sp,
                     fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 if (r.sub.isNotEmpty()) {
-                    Text(r.sub, color = Color(0xFF94A3B8), fontSize = 13.sp, maxLines = 1)
+                    Text(r.sub, color = Color(0xFF94A3B8), fontSize = subSize.sp, maxLines = 1)
                     Spacer(Modifier.width(8.dp))
                 }
-                if (r.badge.isNotEmpty()) Text(r.badge, color = Color(0xFFFFD54F), fontSize = 16.sp)
+                if (r.badge.isNotEmpty()) Text(r.badge, color = Color(0xFFFFD54F), fontSize = textSize.sp)
             }
         }
     }
@@ -312,12 +405,18 @@ fun TvList(
 
 @Composable
 fun PanelHeader(text: String) {
+    val device = rememberDeviceType()
+    val size = when (device) {
+        DeviceType.TV -> 22f
+        DeviceType.TABLET -> 20f
+        DeviceType.PHONE -> 18f
+    }
     Text(
         text,
         color = Accent,
-        fontSize = 18.sp,
+        fontSize = size.sp,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
     )
 }
 

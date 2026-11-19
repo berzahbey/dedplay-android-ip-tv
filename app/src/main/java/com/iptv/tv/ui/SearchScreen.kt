@@ -154,7 +154,7 @@ fun SearchScreen(vm: AppViewModel) {
                 },
                 selected = if (listFocused) cur else -1,
                 modifier = Modifier.fillMaxSize(),
-                rowHeight = 60,
+                rowHeight = 60.dp,
                 onClick = { i -> sel = i; results.getOrNull(i)?.let { vm.openSearchResult(it) } },
                 onLongClick = { i ->
                     results.getOrNull(i)?.let {

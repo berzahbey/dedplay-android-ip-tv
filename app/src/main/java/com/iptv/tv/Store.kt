@@ -20,13 +20,18 @@ class Store(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("iptv", Context.MODE_PRIVATE)
 
     fun loadSources(): List<Source> {
-        val arr = JSONArray(prefs.getString("sources", "[]"))
-        return (0 until arr.length()).map {
-            val o = arr.getJSONObject(it)
-            Source(
-                o.getString("id"), o.getString("name"), o.getString("type"),
-                o.optString("url"), o.optString("host"), o.optString("user"), o.optString("pass")
-            )
+        // Bozuk / yarim yazilmis kayit uygulamanin acilista cokmesine yol acmasin:
+        // okunamayan kaynak atlanir, hicbiri okunamiyorsa bos liste doner.
+        val text = prefs.getString("sources", "[]") ?: "[]"
+        val arr = runCatching { JSONArray(text) }.getOrNull() ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            runCatching {
+                val o = arr.getJSONObject(i)
+                Source(
+                    o.getString("id"), o.getString("name"), o.getString("type"),
+                    o.optString("url"), o.optString("host"), o.optString("user"), o.optString("pass")
+                )
+            }.getOrNull()
         }
     }
 
@@ -65,6 +70,11 @@ class Store(private val ctx: Context) {
     var startMode: Int
         get() = prefs.getInt("startMode", 0)
         set(v) { prefs.edit().putInt("startMode", v).apply() }
+
+    /** Tema rengi (THEMES sirasi). */
+    var theme: Int
+        get() = prefs.getInt("theme", 0)
+        set(v) { prefs.edit().putInt("theme", v).apply() }
 
     /** Son otomatik guncelleme denetimi (ms). */
     var lastUpdateCheck: Long

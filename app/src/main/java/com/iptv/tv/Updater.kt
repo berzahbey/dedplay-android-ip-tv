@@ -20,7 +20,8 @@ data class UpdateInfo(val version: String, val apkUrl: String, val sizeBytes: Lo
  */
 object Updater {
     private const val API = "https://api.github.com/repos/berzahbey/dedplay-android-ip-tv/releases/latest"
-    private const val APK_NAME = "dedplay.apk"
+    // Orjinal GitHub deposuyla uyumluluk icin dedplay.apk kullanilir.
+    private val APK_NAMES = listOf("dedplay.apk")
 
     fun currentVersion(ctx: Context): String =
         runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "0"
@@ -36,10 +37,12 @@ object Updater {
             val json = JSONObject(resp.body?.string() ?: return null)
             val tag = json.optString("tag_name").ifEmpty { return null }
             val assets = json.optJSONArray("assets") ?: return null
-            for (i in 0 until assets.length()) {
-                val a = assets.getJSONObject(i)
-                if (a.optString("name") == APK_NAME) {
-                    return UpdateInfo(tag.removePrefix("v"), a.optString("browser_download_url"), a.optLong("size"))
+            for (name in APK_NAMES) {
+                for (i in 0 until assets.length()) {
+                    val a = assets.getJSONObject(i)
+                    if (a.optString("name") == name) {
+                        return UpdateInfo(tag.removePrefix("v"), a.optString("browser_download_url"), a.optLong("size"))
+                    }
                 }
             }
         }

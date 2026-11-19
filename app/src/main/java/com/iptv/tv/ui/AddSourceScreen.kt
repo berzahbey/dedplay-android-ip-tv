@@ -1,6 +1,9 @@
 package com.iptv.tv.ui
 
 import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
@@ -56,7 +59,7 @@ fun TvButton(text: String, modifier: Modifier = Modifier, selected: Boolean = fa
             .background(
                 when {
                     focused -> RowSelected
-                    selected -> Color(0xFF323842)
+                    selected -> RowSelected
                     else -> RowBg
                 }, shape
             )
@@ -83,6 +86,22 @@ fun AddSourceScreen(vm: AppViewModel) {
     var fileUri by remember { mutableStateOf<Uri?>(null) }
     var fileName by remember { mutableStateOf("") }
     val ctx = LocalContext.current
+    val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    fun pasteUrl() {
+        val clip = clipboard.primaryClip
+        if (clip != null && clip.itemCount > 0) {
+            val text = clip.getItemAt(0).text
+            if (text != null && text.isNotBlank()) {
+                url = text.toString().trim()
+                status = "Link panodan yapıştırıldı"
+            } else {
+                status = "Pano boş"
+            }
+        } else {
+            status = "Pano boş"
+        }
+    }
 
     // Sistem dosya secicisi (telefon, tablet; bircok Android TV'de de var)
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -205,8 +224,11 @@ fun AddSourceScreen(vm: AppViewModel) {
         OutlinedTextField(name, { name = it }, fm, label = { Text("Kaynak adı") }, singleLine = true,
             colors = colors, keyboardOptions = next, keyboardActions = nextAction)
         if (type == "m3u") {
-            OutlinedTextField(url, { url = it }, fm, label = { Text("M3U linki (http://...)") }, singleLine = true,
-                colors = colors, keyboardOptions = next, keyboardActions = nextAction)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(url, { url = it }, fm, label = { Text("M3U linki (http://...)") }, singleLine = true,
+                    colors = colors, keyboardOptions = next, keyboardActions = nextAction)
+                TvButton("Yapıştır", modifier = Modifier.widthIn(min = 110.dp), compact = true) { pasteUrl() }
+            }
         } else if (type == "m3ufile") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TvButton(if (fileUri == null) "Dosya seç (.m3u / .m3u8)" else "Başka dosya seç") { pickFile() }

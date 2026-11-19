@@ -9,6 +9,7 @@ android {
 
     defaultConfig {
         // Uygulamanin Android / Play kimligi (kod paketi namespace olarak com.iptv.tv kalir)
+        // Orjinal GitHub deposuyla uyumluluk icin dedplay applicationId korundu.
         applicationId = "nl.dedplay.iptv"
         minSdk = 23
         targetSdk = 34
