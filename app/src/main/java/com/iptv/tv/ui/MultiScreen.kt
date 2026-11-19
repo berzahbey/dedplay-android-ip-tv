@@ -194,7 +194,7 @@ fun MultiScreen(vm: AppViewModel) {
             return
         }
         try {
-            vm.beginMultiPick(cur.sourceId)
+            vm.beginMultiPick(cur.sourceId ?: "")
             pickContent = when (cur.item.kind) {
                 "movie" -> "film"
                 "series" -> "dizi"
