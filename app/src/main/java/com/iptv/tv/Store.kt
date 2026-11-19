@@ -58,7 +58,7 @@ class Store(private val ctx: Context) {
 
     /** 0 = Sigdir, 1 = Doldur (kirp), 2 = Uzat */
     var resizeMode: Int
-        get() = prefs.getInt("resize", 0)
+        get() = prefs.getInt("resize", 2)
         set(v) { prefs.edit().putInt("resize", v).apply() }
 
     /** 0 = Dusuk, 1 = Normal, 2 = Yuksek tampon */
