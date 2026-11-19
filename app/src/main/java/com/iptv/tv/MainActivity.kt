@@ -52,11 +52,11 @@ class MainActivity : ComponentActivity() {
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE,
-            KeyEvent.KEYCODE_POWER -> return false
+            KeyEvent.KEYCODE_POWER -> return super.dispatchKeyEvent(event)
         }
         val fr = KeyFocus.current ?: return super.dispatchKeyEvent(event)
         if (runCatching { fr.requestFocus() }.isFailure) return super.dispatchKeyEvent(event)
-        return super.dispatchKeyEvent(event)
+        return true
     }
 
     override fun onStop() {

@@ -95,6 +95,7 @@ fun MultiScreen(vm: AppViewModel) {
     var pickGroupIdx by remember { mutableIntStateOf(0) }
     var pickChanIdx by remember { mutableIntStateOf(0) }
     var pickSourceIdx by remember { mutableIntStateOf(0) }
+    var lastPickMode by remember { mutableStateOf(PickMode.GROUPS) }
 
     val settingRows = listOf(
         ListRow("Düzen: " + (if (layout == 2) "2'li" else "4'lü"), sub = "Karo sayısını değiştir"),
@@ -193,8 +194,8 @@ fun MultiScreen(vm: AppViewModel) {
             "series" -> "dizi"
             else -> "canli"
         }
-        // Ilk olarak tum gruplari goster, kullanici gruptan kanallara gidebilsin
-        pickMode = PickMode.GROUPS
+        // Son secilen moda don, ilk acilis da GROUPS
+        pickMode = lastPickMode
         pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
         // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
         val groups = vm.multiPickGroups(pickContent)
