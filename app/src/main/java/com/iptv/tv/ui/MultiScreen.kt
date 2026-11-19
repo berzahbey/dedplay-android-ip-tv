@@ -334,7 +334,7 @@ fun MultiScreen(vm: AppViewModel) {
                         }
                         PickMode.CHANNELS -> {
                             pickList.getOrNull(pickChanIdx)?.let {
-                                vm.multiTiles[focus] = MultiChannel(vm.multiPickSourceId, it)
+                                vm.setMultiTile(focus, MultiChannel(vm.multiPickSourceId, it))
                                 picker = false
                                 pickMode = PickMode.TOP
                             }
@@ -478,7 +478,7 @@ fun MultiScreen(vm: AppViewModel) {
                                 onClick = { i ->
                                     pickChanIdx = i
                                     pickList.getOrNull(i)?.let {
-                                        vm.multiTiles[focus] = MultiChannel(vm.multiPickSourceId, it)
+                                        vm.setMultiTile(focus, MultiChannel(vm.multiPickSourceId, it))
                                         picker = false
                                         pickMode = PickMode.TOP
                                     }

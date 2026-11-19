@@ -280,4 +280,40 @@ class Store(private val ctx: Context) {
     }.getOrNull()
 
     fun clearCache(sourceId: String) { cacheFile(sourceId).delete() }
+
+    // ---------- Coklu ekran karo secimi kaliciligi ----------
+    /** Coklu ekrandaki her karo icin secilen kaynak + kanal kalici olarak saklanir. */
+    fun saveMultiTiles(tiles: List<MultiChannel?>) {
+        val arr = JSONArray()
+        tiles.forEach { ch ->
+            val o = JSONObject()
+            o.put("sourceId", ch?.sourceId ?: "")
+            o.put("itemId", ch?.item?.id ?: "")
+            o.put("itemName", ch?.item?.name ?: "")
+            o.put("itemLogo", ch?.item?.logo ?: "")
+            o.put("itemGroup", ch?.item?.group ?: "")
+            o.put("itemUrl", ch?.item?.url ?: "")
+            o.put("itemKind", ch?.item?.kind ?: "")
+            arr.put(o)
+        }
+        prefs.edit().putString("multiTiles", arr.toString()).apply()
+    }
+
+    fun loadMultiTiles(): List<MultiChannel?> {
+        val text = prefs.getString("multiTiles", "") ?: ""
+        if (text.isEmpty()) return emptyList()
+        val arr = runCatching { JSONArray(text) }.getOrNull() ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.getJSONObject(i)
+            val item = Item(
+                o.getString("itemId"),
+                o.optString("itemName"),
+                o.optString("itemLogo"),
+                o.optString("itemGroup"),
+                o.optString("itemUrl"),
+                o.optString("itemKind")
+            )
+            MultiChannel(o.getString("sourceId"), item)
+        }
+    }
 }

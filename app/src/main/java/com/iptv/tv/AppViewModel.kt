@@ -1276,9 +1276,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .build()
     }
 
-    /** Coklu ekrana ilk giriste 4 karonu doldur. Sonraki girislerde degismez (her karo kendi kaynagini korur). */
+    /** Coklu ekrana ilk giriste 4 karonu doldur. Sonraki girislerde degismez (her karo kendi kaynagini korur).
+     *  Secimler Store'da kalici olarak tutulur, uygulama kapanip acilinca kaydedilen secimler geriye yuklenir. */
     fun multiEnsureInitial() {
         if (multiTiles.isNotEmpty()) return
+        // Once kayitli secimleri yukle
+        val saved = store.loadMultiTiles()
+        if (saved.isNotEmpty()) {
+            multiTiles.addAll(saved)
+            // Eksik karolari doldur
+            while (multiTiles.size < 4) multiTiles.add(null)
+            return
+        }
         val out = ArrayList<MultiChannel?>()
         val srcId = activeSource()?.id ?: activeId
         currentChannel?.let { out.add(MultiChannel(srcId, it)) }
@@ -1289,6 +1298,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         while (out.size < 4) out.add(null)
         multiTiles.addAll(out)
+        store.saveMultiTiles(multiTiles.toList())
+    }
+
+    /** Coklu ekrandaki bir karoyu secilen kaynaga/kanala degistirir ve kalici olarak kaydeder. */
+    fun setMultiTile(index: Int, ch: MultiChannel?) {
+        if (index in multiTiles.indices) multiTiles[index] = ch
+        store.saveMultiTiles(multiTiles.toList())
     }
 
     /** Coklu ekrandan secilen karoyu tam ekranda ac (gerekirse kaynagini da degistirir). */
