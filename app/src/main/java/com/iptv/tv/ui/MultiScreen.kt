@@ -193,7 +193,8 @@ fun MultiScreen(vm: AppViewModel) {
             "series" -> "dizi"
             else -> "canli"
         }
-        pickMode = PickMode.TOP
+        // Ilk olarak tum gruplari goster, kullanici gruptan kanallara gidebilsin
+        pickMode = PickMode.GROUPS
         pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
         // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
         val groups = vm.multiPickGroups(pickContent)
