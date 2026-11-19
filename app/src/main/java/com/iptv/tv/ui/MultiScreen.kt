@@ -194,14 +194,24 @@ fun MultiScreen(vm: AppViewModel) {
             "series" -> "dizi"
             else -> "canli"
         }
-        // Son secilen moda don, ilk acilis da GROUPS
-        pickMode = lastPickMode
+        // Ilk acishda secili kanal varsa kanallara, yoksa gruplara git
+        pickMode = if (cur != null && cur.item.id.isNotEmpty()) PickMode.CHANNELS else PickMode.GROUPS
         pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
         // Son secilen grup/kanal hatirlenir, sadece gecerli aralikta tutulur
         val groups = vm.multiPickGroups(pickContent)
-        pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
+        if (cur != null && cur.item.id.isNotEmpty()) {
+            // Mevcut grubu bul
+            pickGroupIdx = groups.indexOfFirst { it == cur.item.group }.coerceIn(0, groups.size - 1)
+        } else {
+            pickGroupIdx = pickGroupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
+        }
         val list = vm.multiPickItems(pickContent, groups.getOrNull(pickGroupIdx) ?: FAV_GROUP)
-        pickChanIdx = pickChanIdx.coerceIn(0, (list.size - 1).coerceAtLeast(0))
+        if (cur != null && cur.item.id.isNotEmpty()) {
+            // Mevcut kanali listede bul
+            pickChanIdx = list.indexOfFirst { it.id == cur.item.id }.coerceIn(0, list.size - 1)
+        } else {
+            pickChanIdx = pickChanIdx.coerceIn(0, (list.size - 1).coerceAtLeast(0))
+        }
         picker = true
     }
 
@@ -311,8 +321,8 @@ fun MultiScreen(vm: AppViewModel) {
                     if (picker) {
                         when (pickMode) {
                             PickMode.SETTINGS -> pickMode = PickMode.GROUPS
-                            PickMode.GROUPS -> pickMode = PickMode.CHANNELS
-                            PickMode.SOURCES -> pickMode = PickMode.CHANNELS
+                            PickMode.GROUPS -> { pickMode = PickMode.CHANNELS; lastPickMode = PickMode.CHANNELS }
+                            PickMode.SOURCES -> { pickMode = PickMode.CHANNELS; lastPickMode = PickMode.CHANNELS }
                             PickMode.CHANNELS -> {}
                             PickMode.TOP -> {}
                         }
@@ -340,6 +350,7 @@ fun MultiScreen(vm: AppViewModel) {
                                 vm.setMultiTile(focus, MultiChannel(vm.multiPickSourceId, it))
                                 picker = false
                                 pickMode = PickMode.TOP
+                                lastPickMode = PickMode.CHANNELS
                             }
                         }
                         PickMode.SETTINGS -> pickAt(pSel)
