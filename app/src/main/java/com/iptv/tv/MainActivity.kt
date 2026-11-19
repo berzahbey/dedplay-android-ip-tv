@@ -49,14 +49,13 @@ class MainActivity : ComponentActivity() {
      * ekrana geri ver ve tusu bir kez daha gonder. (Geri / Home sisteme birakilir.)
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (super.dispatchKeyEvent(event)) return true
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE,
             KeyEvent.KEYCODE_POWER -> return false
         }
-        val fr = KeyFocus.current ?: return false
-        if (runCatching { fr.requestFocus() }.isFailure) return false
+        val fr = KeyFocus.current ?: return super.dispatchKeyEvent(event)
+        if (runCatching { fr.requestFocus() }.isFailure) return super.dispatchKeyEvent(event)
         return super.dispatchKeyEvent(event)
     }
 
