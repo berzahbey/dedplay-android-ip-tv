@@ -79,7 +79,7 @@ En az **Android 6.0** gerekir.
 
 ### Güncelleme
 
-v1.8 ve sonrası kendini günceller: uygulama günde bir kez GitHub'daki son sürüme bakar, yeni sürüm varsa haber verir. **Ayarlar > ⬆ Güncelle** ile indirilir ve Android'in kurulum ekranı açılır; **Yükle**'ye basmanız yeterli (ayarlar ve favoriler silinmez). İlk seferde Android "bu kaynaktan yüklemeye izin ver" onayı ister. Elle denetlemek için: Ayarlar > *Güncellemeleri denetle*.
+v1.9 ve sonrası kendini günceller: uygulama günde bir kez GitHub'daki son sürüme bakar, yeni sürüm varsa haber verir. **Ayarlar > ⬆ Güncelle** ile indirilir ve Android'in kurulum ekranı açılır; **Yükle**'ye basmanız yeterli (ayarlar ve favoriler silinmez). İlk seferde Android "bu kaynaktan yüklemeye izin ver" onayı ister. Elle denetlemek için: Ayarlar > *Güncellemeleri denetle*.
 
 ## İlk kullanım
 
