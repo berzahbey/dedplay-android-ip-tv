@@ -347,7 +347,7 @@ fun MultiScreen(vm: AppViewModel) {
                 onChannelUp = { true },
                 onChannelDown = { true }
             )
-            .then(if (isTv) Modifier.focusRequester(fr).focusable() else Modifier)
+            .then(Modifier.focusRequester(fr).focusable())
     ) {
         val rows = if (layout == 2) listOf(listOf(0, 1)) else listOf(listOf(0, 1), listOf(2, 3))
         Column(Modifier.fillMaxSize()) {
