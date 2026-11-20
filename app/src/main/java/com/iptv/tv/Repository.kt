@@ -113,12 +113,10 @@ object Repository {
             val trimmed = line.trim()
             if (trimmed.isEmpty() || trimmed.startsWith("#")) trimmed
             else if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true) || trimmed.startsWith("rtmp://", ignoreCase = true)) trimmed
-            else if (trimmed.startsWith("/")) trimmed
-            else "$parentDir/$trimmed"
+            else if (trimmed.startsWith("/")) "file://$trimmed"
+            else "file://$parentDir/$trimmed"
         }.joinToString("\n")
-        val tempFile = java.io.File("${parentDir}/.temp_m3u_${System.currentTimeMillis()}.m3u")
-        tempFile.writeText(resolvedContent, Charsets.UTF_8)
-        return tempFile.bufferedReader(Charsets.UTF_8).use { M3uParser.parse(it) }
+        return java.io.StringReader(resolvedContent).bufferedReader().use { M3uParser.parse(it) }
     }
 
     private fun loadM3u(src: Source): Library {
