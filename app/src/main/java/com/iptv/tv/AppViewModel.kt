@@ -618,7 +618,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         currentChannel = item
         store.lastChannelId = item.id
         updateSessionTitle(item.name)
-        play(liveUrl(item))
+        play(liveUrl(item), playbackHeaders)
     }
 
     /** Bir onceki izlenen kanala doner. */
