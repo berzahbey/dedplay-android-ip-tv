@@ -108,15 +108,7 @@ object Repository {
     private fun loadM3uFile(src: Source): Library {
         val f = java.io.File(src.url)
         if (!f.exists()) throw RuntimeException("M3U dosyası bulunamadı. Kaynağı silip dosyayı yeniden ekleyin.")
-        val parentDir = f.parentFile.absolutePath
-        val resolvedContent = f.readLines(Charsets.UTF_8).map { line ->
-            val trimmed = line.trim()
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) trimmed
-            else if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true) || trimmed.startsWith("rtmp://", ignoreCase = true)) trimmed
-            else if (trimmed.startsWith("/")) "file://$trimmed"
-            else "file://$parentDir/$trimmed"
-        }.joinToString("\n")
-        return java.io.StringReader(resolvedContent).bufferedReader().use { M3uParser.parse(it) }
+        return f.bufferedReader(Charsets.UTF_8).use { M3uParser.parse(it) }
     }
 
     private fun loadM3u(src: Source): Library {
