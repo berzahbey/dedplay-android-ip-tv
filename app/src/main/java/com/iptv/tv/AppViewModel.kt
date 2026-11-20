@@ -1276,8 +1276,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .build()
     }
 
-    /** Coklu ekrana giriste 4 karonu her seferinde doldurur. */
+    /** Coklu ekrana giriste 4 karonu bir kez doldur. Sonraki girislerde kayitli secimler kalir. */
     fun multiEnsureInitial() {
+        if (multiTiles.isNotEmpty()) return
+        // Kayitli secimleri yukle
+        val saved = store.loadMultiTiles()
+        if (saved.isNotEmpty()) {
+            multiTiles.addAll(saved)
+            // Eksik karolari doldur
+            while (multiTiles.size < 4) multiTiles.add(null)
+            return
+        }
+        // Ilk kez aciliyorsa: aktif kaynaktan doldur
         val out = ArrayList<MultiChannel?>()
         val srcId = activeSource()?.id ?: activeId
         currentChannel?.let { out.add(MultiChannel(srcId, it)) }
@@ -1287,7 +1297,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (out.none { o -> o?.item?.id == it.id }) out.add(MultiChannel(srcId, it))
         }
         while (out.size < 4) out.add(null)
-        multiTiles.clear()
         multiTiles.addAll(out)
         store.saveMultiTiles(multiTiles.toList())
     }
