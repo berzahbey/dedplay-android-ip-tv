@@ -598,9 +598,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         player.volume = 1f
         mediaInfo = ""
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
-        player.setMediaItem(MediaItem.fromUri(url))
-        player.prepare()
-        player.playWhenReady = true
+        viewModelScope.launch {
+            val resolved = resolveStreamUrl(url)
+            withContext(Dispatchers.Main) {
+                if (resolved != url) playingUrl = resolved
+                player.setMediaItem(MediaItem.fromUri(resolved))
+                player.prepare()
+                player.playWhenReady = true
+            }
+        }
+    }
+
+    /** HLS master playlist'i cozer, en yuksek bant genisligindeki media playlist URL'sini dondurur. */
+    private suspend fun resolveStreamUrl(url: String): String = withContext(Dispatchers.IO) {
+        try {
+            val req = okhttp3.Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
+            Http.client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use url
+                val body = resp.body ?: return@use url
+                val text = body.string()
+                val lines = text.lines()
+                var bestBw = 0L
+                var bestUrl: String? = null
+                var i = 0
+                while (i < lines.size) {
+                    val line = lines[i].trim()
+                    if (line.startsWith("#EXT-X-STREAM-INF:", ignoreCase = true) && "I-FRAME" !in line) {
+                        val bwMatch = Regex("BANDWIDTH=(\d+)").find(line)
+                        val bw = bwMatch?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
+                        if (i + 1 < lines.size) {
+                            val next = lines[i + 1].trim()
+                            if (next.isNotEmpty() && !next.startsWith("#") && bw > bestBw) {
+                                bestBw = bw
+                                bestUrl = next
+                            }
+                        }
+                        i += 2
+                    } else {
+                        i += 1
+                    }
+                }
+                bestUrl ?: url
+            }
+        } catch (e: Exception) {
+            url
+        }
     }
 
     private fun stopPlayback() {
