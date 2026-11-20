@@ -689,6 +689,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         vodTitle = title
         vodReturn = back
         updateSessionTitle(title)
+        if (url.isEmpty()) {
+            toast("Bu kanalin yayin adresi bos")
+            return
+        }
         stopPlayback()
         play(url)
         screen = Screen.PLAYER
