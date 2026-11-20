@@ -598,7 +598,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         player.volume = 1f
         mediaInfo = ""
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
-        player.setMediaItem(MediaItem.fromUri(url, headers))
+        player.setMediaItem(MediaItem.Builder().setUri(url).setHttpHeaders(headers).build())
         player.prepare()
         player.playWhenReady = true
     }
