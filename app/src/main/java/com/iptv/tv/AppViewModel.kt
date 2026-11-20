@@ -598,7 +598,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         player.volume = 1f
         mediaInfo = ""
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
-        player.setMediaItem(MediaItem.Builder().setUri(url).setHttpHeaders(headers).build())
+        player.setMediaItem(MediaItem.fromUri(url))
         player.prepare()
         player.playWhenReady = true
     }
@@ -1157,7 +1157,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var multiExtraSourceId: String? = null
     private var multiExtraLib by mutableStateOf<Library?>(null)
     private var multiPickJob: Job? = null
-    /** Uygulama ici oynatma basliklari (User-Agent, Referer vb.) */
+    /** Coklu ekran oynatici icin izin basliklari (User-Agent vb.) */
     var playbackHeaders by mutableStateOf(mapOf(
         "User-Agent" to "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Mobile Safari/537.36",
         "Referer" to "https://ha.vixolity.com/"
