@@ -588,7 +588,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun isLiveActive() = screen == Screen.LIVE && playingUrl.isNotEmpty()
 
-    private fun play(url: String) {
+    private fun play(url: String, headers: Map<String, String> = emptyMap()) {
         playingUrl = url
         playerMessage = null
         lastFrames = -1
@@ -597,9 +597,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         liveInBackground = false
         player.volume = 1f
         mediaInfo = ""
-        // Onceki kanalin ses/altyazi secimi yeni kanala tasinmasin (dil tercihi kalir)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
-        player.setMediaItem(MediaItem.fromUri(url))
+        player.setMediaItem(MediaItem.fromUri(url, headers))
         player.prepare()
         player.playWhenReady = true
     }
@@ -694,7 +693,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         stopPlayback()
-        play(url)
+        play(url, playbackHeaders)
         screen = Screen.PLAYER
     }
 
@@ -1158,6 +1157,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var multiExtraSourceId: String? = null
     private var multiExtraLib by mutableStateOf<Library?>(null)
     private var multiPickJob: Job? = null
+    /** Coklu ekran oynatici icin izin basliklari (User-Agent vb.) */
+    var playbackHeaders by mutableStateOf(emptyMap<String, String>())
 
     fun sourceName(id: String): String = sources.firstOrNull { it.id == id }?.name ?: "-"
 
