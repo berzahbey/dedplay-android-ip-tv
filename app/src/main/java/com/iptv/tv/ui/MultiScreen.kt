@@ -74,7 +74,8 @@ fun MultiScreen(vm: AppViewModel) {
     val failed = remember { mutableStateListOf(false, false, false, false) }
     val loadingTile = remember { mutableStateListOf(false, false, false, false) }
     var layout by remember { mutableIntStateOf(vm.multiLayout) }
-    var focus by remember { mutableIntStateOf(0) }
+    var focus by remember { mutableIntStateOf(vm.multiFocus.coerceIn(0, (vm.multiLayout - 1).coerceAtLeast(0))) }
+    LaunchedEffect(focus) { vm.multiFocus = focus }
     var picker by remember { mutableStateOf(false) }
     var activity by remember { mutableIntStateOf(0) }
     var active by remember { mutableStateOf(true) }

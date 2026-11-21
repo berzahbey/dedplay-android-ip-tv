@@ -85,7 +85,8 @@ fun OptionsPanel(
     selected: Int,
     hint: String,
     title: String = "SEÇENEKLER",
-    onClick: ((Int) -> Unit)? = null
+    onClick: ((Int) -> Unit)? = null,
+    onLongClick: ((Int) -> Unit)? = null
 ) {
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -101,7 +102,8 @@ fun OptionsPanel(
             TvList(
                 items.map { it.row }, selected, Modifier.weight(1f),
                 emptyText = "Bu kanal için yayın akışı yok.",
-                onClick = onClick
+                onClick = onClick,
+                onLongClick = onLongClick
             )
             Text(hint, color = Color(0xFF94A3B8), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
         }

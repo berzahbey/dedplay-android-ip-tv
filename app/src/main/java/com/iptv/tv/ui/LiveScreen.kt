@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -178,10 +180,10 @@ fun LiveScreen(vm: AppViewModel) {
     }
 
     LaunchedEffect(panel, touchTick, chanIdx, groupIdx, menuIdx, optIdx, epgIdx) {
-        if (isTv) return@LaunchedEffect
+        // Islem yoksa listeler kendiliginden kapanir (her tus / dokunma sureyi bastan baslatir).
+        // TV'de kumandayla gezinmeye biraz daha zaman: 7 sn; dokunmatikte 5 sn.
         when (panel) {
-            // Soldaki listeler: 5 sn dokunulmazsa kapanir
-            Panel.CHANNELS, Panel.GROUPS, Panel.MENU -> { delay(5000); panel = Panel.NONE }
+            Panel.CHANNELS, Panel.GROUPS, Panel.MENU -> { delay(if (isTv) 7000 else 5000); panel = Panel.NONE }
             // Sagdaki secenekler / yayin akisi: okumaya zaman kalsin diye 8 sn
             Panel.OPTIONS, Panel.EPG -> { delay(8000); panel = Panel.NONE }
             else -> {}
@@ -192,6 +194,7 @@ fun LiveScreen(vm: AppViewModel) {
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .onPreviewKeyEvent { touchTick++; false }
             .pointerInput(Unit) {
                 // Her dokunma / kaydirma (listenin icindekiler dahil) sayaci sifirlar
                 awaitPointerEventScope {
@@ -325,7 +328,10 @@ fun LiveScreen(vm: AppViewModel) {
                 }
             )
     ) {
-        PlayerSurface(vm.player, vm.resizeMode)
+        // Doldur / Uzat: TextureView (her cihazda olcege uyar; TV'lerde SurfaceView bunu yok sayabiliyor).
+        // Sigdir: SurfaceView (daha verimli). Yuzey turu degisince gorunum yeniden kurulur.
+        val scaled = vm.resizeMode != 0
+        key(scaled) { PlayerSurface(vm.player, vm.resizeMode, clipToTile = scaled) }
 
         if (vm.buffering) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Accent)

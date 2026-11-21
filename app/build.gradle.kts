@@ -13,8 +13,8 @@ android {
         applicationId = "nl.dedplay.iptv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 57
-        versionName = "1.9.30"
+        versionCode = 58
+        versionName = "1.9.31"
         // Sadece ARM islemciler (TV kutulari, telefon, tablet, arac kutulari): APK daha kucuk
         ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }

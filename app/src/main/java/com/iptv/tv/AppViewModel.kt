@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
@@ -206,6 +207,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         com.iptv.tv.ui.ThemeState.index = store.theme.coerceIn(0, com.iptv.tv.ui.THEMES.size - 1)
+        // Son izleme sekli hatirlansin: coklu ekran mi, tam ekran canli mi (hangi yoldan gecilirse gecilsin)
+        viewModelScope.launch {
+            snapshotFlow { screen }.collect { s ->
+                if (s == Screen.MULTI) store.lastScreenMulti = true
+                else if (s == Screen.LIVE) store.lastScreenMulti = false
+            }
+        }
         Recorder.load(app)
         Recorder.ensureService(app)
         setupMediaSession()
@@ -405,6 +413,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onDone(e.message ?: "Bağlanılamadı")
             }
         }
+    }
+
+    /** Herhangi bir kaynagi siler (aktifse bir sonrakine gecer); coklu ekrandaki karolarindan da cikarir. */
+    fun deleteSource(id: String) {
+        if (id == activeId) deleteActive() else removeSource(id)
+        var changed = false
+        for (i in multiTiles.indices) {
+            if (multiTiles[i]?.sourceId == id) { multiTiles[i] = null; changed = true }
+        }
+        if (changed) store.saveMultiTiles(multiTiles.toList())
     }
 
     /** Kaynagi id ile siler (aktif olani degistirmeden). */
@@ -678,11 +696,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun ensureLive() {
         val lib = library ?: return
-        // Sadece film / dizi iceren liste (orn. film M3U'su): Canli TV bos, kullaniciya yolu goster
+        // Sadece film / dizi iceren liste (orn. film M3U'su): liste ilk acildiginda ilk film baslasin
+        // (bir kez; filmden Canli TV'ye donulunce tekrar baslatilmaz)
         if (lib.live.isEmpty() && (lib.movies.isNotEmpty() || lib.series.isNotEmpty())) {
             if (noLiveHintFor !== lib) {
                 noLiveHintFor = lib
-                toast("Bu listede canlı kanal yok · Menü > Filmler / Diziler")
+                val movie = groups("movie").firstOrNull()?.let { itemsIn("movie", it).firstOrNull() }
+                    ?: lib.movies.firstOrNull()
+                if (movie != null && movie.url.isNotEmpty()) playVod(movie.name, movie.url, Screen.MOVIES)
+                else openScreen(Screen.SERIES)
             }
             return
         }
@@ -699,14 +721,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         var ch = currentChannel
         if (ch == null) {
             ch = liveById[store.lastChannelFor(activeId)]
-            if (ch == null) {
-                val g = groups("live").firstOrNull()
-                // Gizlenen / calismayan kanallar atlanir
-                ch = if (g != null) itemsIn("live", g).firstOrNull() ?: idx["live"]?.get(g)?.firstOrNull() else lib.live.firstOrNull()
+            if (ch != null) {
+                currentChannel = ch
+                liveGroup = if (ch.group in groups("live")) ch.group else ALL_GROUP
+            } else {
+                // Liste ilk kez aciliyor: favorilerdeki ilk kanal, favori yoksa "Tüm Kanallar"in ilki
+                // (gizlenen / calismayan kanallar atlanir)
+                val fav = itemsIn("live", FAV_GROUP).firstOrNull()
+                if (fav != null) { ch = fav; liveGroup = FAV_GROUP }
+                else { ch = itemsIn("live", ALL_GROUP).firstOrNull() ?: lib.live.firstOrNull(); liveGroup = ALL_GROUP }
+                if (ch == null) return
+                currentChannel = ch
             }
-            if (ch == null) return
-            currentChannel = ch
-            liveGroup = if (ch.group in groups("live")) ch.group else (groups("live").firstOrNull() ?: FAV_GROUP)
         }
         if (playingUrl != liveUrl(ch)) {
             store.setLastChannel(activeId, ch.id)
@@ -723,6 +749,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val n = if (i < 0) 0 else (i + delta).mod(list.size)
         playLive(list[n])
     }
+
+    /** Film / dizi ekraninda son grup, secili oge ve sutun (oynaticidan donunce ayni yere donulur). */
+    val browseGroup = HashMap<String, Int>()
+    val browseItem = HashMap<String, Int>()
+    val browseCol = HashMap<String, Int>()
 
     fun playVod(title: String, url: String, back: Screen) {
         vodTitle = title
@@ -743,8 +774,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openScreen(s: Screen) {
-        if (s == Screen.MULTI) store.lastScreenMulti = true
-        else if (s == Screen.LIVE) store.lastScreenMulti = false
         val liveNow = (screen == Screen.LIVE || liveInBackground) && playingUrl.isNotEmpty()
         when {
             s == Screen.LIVE -> if (liveInBackground) {
@@ -1183,6 +1212,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var multiLayout by mutableIntStateOf(store.loadMultiLayout())
     /** Coklu ekran karo goruntusu: 0 Sigdir, 1 Doldur (kirp), 2 Uzat. Varsayilan: Doldur. */
     var multiFit by mutableIntStateOf(store.multiFit)
+    /** Coklu ekranda secili (sesi gelen) karo; uygulama tekrar acilinca ayni karo secili gelir. */
+    var multiFocus: Int
+        get() = store.multiFocus
+        set(v) { store.multiFocus = v }
 
     fun cycleMultiFit() {
         multiFit = (multiFit + 1) % 3

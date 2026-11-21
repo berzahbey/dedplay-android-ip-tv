@@ -12,6 +12,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -21,6 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -73,10 +77,24 @@ fun PlayerScreen(vm: AppViewModel) {
 
     fun openOptions() { optIdx = 0; showOptions = true }
 
+    // Secenek listesi islem yoksa kendiliginden kapanir, film devam eder
+    // (her tus / dokunma sureyi bastan baslatir): TV'de 7 sn, dokunmatikte 8 sn
+    val isTv = rememberIsTv()
+    var touchTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(showOptions, optIdx, touchTick) {
+        if (showOptions) { delay(if (isTv) 7000 else 8000); showOptions = false }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .onPreviewKeyEvent { touchTick++; false }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) { awaitPointerEvent(PointerEventPass.Initial); touchTick++ }
+                }
+            }
             .tvKeys(
                 onLeft = { if (showOptions) showOptions = false else seek(-10_000); true },
                 onRight = { if (!showOptions) seek(10_000); true },
@@ -117,7 +135,10 @@ fun PlayerScreen(vm: AppViewModel) {
             .focusRequester(fr)
             .focusable()
     ) {
-        PlayerSurface(player, vm.resizeMode)
+        // Doldur / Uzat: TextureView (her cihazda olcege uyar; TV'lerde SurfaceView bunu yok sayabiliyor).
+        // Sigdir: SurfaceView (daha verimli). Yuzey turu degisince gorunum yeniden kurulur.
+        val scaled = vm.resizeMode != 0
+        key(scaled) { PlayerSurface(player, vm.resizeMode, clipToTile = scaled) }
         if (vm.buffering) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Accent)
         vm.playerMessage?.let {
             Text(it, color = Color.White, fontSize = 22.sp, modifier = Modifier.align(Alignment.Center))

@@ -69,6 +69,11 @@ class Store(private val ctx: Context) {
         get() = prefs.getBoolean("lastScreenMulti", false)
         set(v) { prefs.edit().putBoolean("lastScreenMulti", v).apply() }
 
+    /** Coklu ekranda secili karo. */
+    var multiFocus: Int
+        get() = prefs.getInt("multiFocus", 0)
+        set(v) { prefs.edit().putInt("multiFocus", v).apply() }
+
     /** Coklu ekran karo goruntusu: 0 Sigdir, 1 Doldur (kirp), 2 Uzat. */
     var multiFit: Int
         get() = prefs.getInt("multiFit", 1)
@@ -86,7 +91,8 @@ class Store(private val ctx: Context) {
 
     /** Uygulama acilisi: 0 = favorilerdeki ilk kanal, 1 = son izlenen kanal */
     var startMode: Int
-        get() = prefs.getInt("startMode", 0)
+        // Varsayilan: son izlenen kanal (uygulama kapatildigi haliyle acilir)
+        get() = prefs.getInt("startMode", 1)
         set(v) { prefs.edit().putInt("startMode", v).apply() }
 
     /** Tema rengi (THEMES sirasi). */

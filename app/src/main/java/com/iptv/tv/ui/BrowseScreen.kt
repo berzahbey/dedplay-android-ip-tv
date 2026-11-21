@@ -35,9 +35,13 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
     val title = if (isSeries) "DİZİLER" else "FİLMLER"
     val backScreen = if (isSeries) Screen.SERIES else Screen.MOVIES
 
-    var col by remember { mutableIntStateOf(if (isSeries && vm.episodes != null) 1 else 0) }
-    var gIdx by remember { mutableIntStateOf(0) }
-    var iIdx by remember { mutableIntStateOf(0) }
+    // Oynaticidan donunce ayni grup / ayni film secili gelsin
+    var col by remember { mutableIntStateOf(if (isSeries && vm.episodes != null) 1 else (vm.browseCol[kind] ?: 0)) }
+    var gIdx by remember { mutableIntStateOf(vm.browseGroup[kind] ?: 0) }
+    var iIdx by remember { mutableIntStateOf(vm.browseItem[kind] ?: 0) }
+    LaunchedEffect(col, gIdx, iIdx) {
+        vm.browseCol[kind] = col; vm.browseGroup[kind] = gIdx; vm.browseItem[kind] = iIdx
+    }
     val fr = remember { FocusRequester() }
     RegisterKeyFocus(fr)
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
