@@ -107,9 +107,8 @@ fun PlayerScreen(vm: AppViewModel) {
     // Secenek listesi islem yoksa kendiliginden kapanir, film devam eder
     // (her tus / dokunma sureyi bastan baslatir): TV'de 7 sn, dokunmatikte 8 sn
     val isTv = rememberIsTv()
+    ResetBrightnessOnExit()
 
-    // Dokunmatik: sag yarida yukari/asagi kaydir = ses, sol yarida = parlaklik (yukari artirir)
-    val adjust = remember { AdjustState() }
     var touchTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(showOptions, optIdx, touchTick) {
         if (showOptions) { delay(if (isTv) 7000 else 8000); showOptions = false }
@@ -156,11 +155,12 @@ fun PlayerScreen(vm: AppViewModel) {
                     else togglePlay()
                 },
                 onLongPress = { if (!showOptions) openOptions() },
+                // Yukari kaydir: sonraki film / bolum, asagi kaydir: onceki (canli TV'deki kanal degistirme gibi)
+                onSwipeUp = { if (!showOptions) vm.nextVod(1) },
+                onSwipeDown = { if (!showOptions) vm.nextVod(-1) },
                 // Cift dokun: sol taraf 10 sn geri, sag taraf 10 sn ileri
                 onDoubleTap = { x -> if (!showOptions) seek(if (x < 0.5f) -10_000 else 10_000) }
             )
-            // touchGestures'tan SONRA: dikey kaydirmayi once bu yakalar
-            .swipeVolumeBrightness(enabled = !isTv, state = adjust)
             .focusRequester(fr)
             .focusable()
     ) {
@@ -172,8 +172,6 @@ fun PlayerScreen(vm: AppViewModel) {
         vm.playerMessage?.let {
             Text(it, color = Color.White, fontSize = 22.sp, modifier = Modifier.align(Alignment.Center))
         }
-        // Ses / parlaklik gostergesi
-        BoxScopeAdjustOverlay(adjust, Modifier.align(Alignment.Center))
         // Duraklatilinca ortada buyuk isaret
         if (!playing && !showOptions) {
             Text(
@@ -220,7 +218,8 @@ fun PlayerScreen(vm: AppViewModel) {
         if (showOptions) {
             OptionsPanel(
                 options, oSel, "OK: Değiştir · ◀ / Geri: Kapat",
-                onClick = { i -> optIdx = i; options.getOrNull(i)?.action?.invoke() }
+                onClick = { i -> optIdx = i; options.getOrNull(i)?.action?.invoke() },
+                top = if (isTv) null else ({ VolumeBrightnessSliders() })
             )
         }
     }

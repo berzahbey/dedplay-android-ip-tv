@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -483,23 +484,58 @@ fun RegisterKeyFocus(fr: FocusRequester) {
     }
 }
 
-/** Ses / parlaklik kaydirma gostergesinin durumu ("🔊 60%"; bossa gizli). */
-class AdjustState {
-    var label by mutableStateOf("")
-    var tick by mutableIntStateOf(0)
-}
-
 /**
- * Dokunmatik: ekranin sag yarisinda yukari/asagi kaydir = ses, sol yarisinda = parlaklik
- * (yukari artirir). Ekrandan cikinca parlaklik sistem ayarina doner. TV'de kapali.
- * Modifier zincirinde touchGestures'tan SONRA eklenmeli (dikey kaydirmayi once bu yakalar).
+ * Tablet / telefon icin sag listede ses ve parlaklik kaydirma cubuklari (saga sola surukle).
+ * Ses: cihazin medya sesi. Parlaklik: sadece bu uygulama penceresi (cikinca cihaz ayarina doner).
  */
 @Composable
-fun Modifier.swipeVolumeBrightness(enabled: Boolean, state: AdjustState): Modifier {
+fun VolumeBrightnessSliders() {
     val ctx = LocalContext.current
     val audio = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager }
     val window = (ctx as? android.app.Activity)?.window
-    LaunchedEffect(state.tick) { if (state.label.isNotEmpty()) { kotlinx.coroutines.delay(1200); state.label = "" } }
+    val maxVol = remember { audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
+    var vol by remember { mutableStateOf(audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()) }
+    var bright by remember {
+        val b = window?.attributes?.screenBrightness ?: -1f
+        mutableStateOf(
+            if (b >= 0f) b else runCatching {
+                android.provider.Settings.System.getInt(ctx.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS) / 255f
+            }.getOrDefault(0.5f).coerceIn(0.02f, 1f)
+        )
+    }
+    val colors = androidx.compose.material3.SliderDefaults.colors(
+        thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = RowSelected
+    )
+    Column(Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("🔊", fontSize = 20.sp, modifier = Modifier.width(32.dp))
+            androidx.compose.material3.Slider(
+                value = vol, onValueChange = { v ->
+                    vol = v
+                    audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v.toInt(), 0)
+                },
+                valueRange = 0f..maxVol.toFloat(), colors = colors, modifier = Modifier.weight(1f)
+            )
+            Text("${(vol * 100 / maxVol).toInt()}%", color = Color.White, fontSize = 13.sp, modifier = Modifier.width(44.dp).padding(start = 6.dp))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("☀", fontSize = 20.sp, color = Color(0xFFFFD54F), modifier = Modifier.width(32.dp))
+            androidx.compose.material3.Slider(
+                value = bright, onValueChange = { v ->
+                    bright = v
+                    window?.let { w -> val lp = w.attributes; lp.screenBrightness = v; w.attributes = lp }
+                },
+                valueRange = 0.02f..1f, colors = colors, modifier = Modifier.weight(1f)
+            )
+            Text("${(bright * 100).toInt()}%", color = Color.White, fontSize = 13.sp, modifier = Modifier.width(44.dp).padding(start = 6.dp))
+        }
+    }
+}
+
+/** Izleme ekranindan cikinca parlaklik cihaz ayarina doner. */
+@Composable
+fun ResetBrightnessOnExit() {
+    val window = (LocalContext.current as? android.app.Activity)?.window
     DisposableEffect(Unit) {
         onDispose {
             window?.let { w ->
@@ -509,57 +545,4 @@ fun Modifier.swipeVolumeBrightness(enabled: Boolean, state: AdjustState): Modifi
             }
         }
     }
-    if (!enabled) return this
-    return this.pointerInput(Unit) {
-        var right = true
-        var acc = 0f
-        var startVol = 0
-        var startBright = 0.5f
-        detectVerticalDragGestures(
-            onDragStart = { off ->
-                right = off.x > size.width / 2f
-                acc = 0f
-                startVol = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
-                val b = window?.attributes?.screenBrightness ?: -1f
-                startBright = if (b >= 0f) b else {
-                    val sys = runCatching {
-                        android.provider.Settings.System.getInt(ctx.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS)
-                    }.getOrDefault(128)
-                    (sys / 255f).coerceIn(0.01f, 1f)
-                }
-            },
-            onVerticalDrag = { change, dy ->
-                change.consume()
-                acc -= dy
-                val frac = acc / (size.height * 0.8f)
-                if (right) {
-                    val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-                    val v = (startVol + frac * max).toInt().coerceIn(0, max)
-                    audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v, 0)
-                    state.label = "🔊 ${v * 100 / max}%"
-                } else {
-                    val b = (startBright + frac).coerceIn(0.01f, 1f)
-                    window?.let { w ->
-                        val lp = w.attributes
-                        lp.screenBrightness = b
-                        w.attributes = lp
-                    }
-                    state.label = "☀ ${(b * 100).toInt()}%"
-                }
-                state.tick++
-            }
-        )
-    }
-}
-
-/** Ekranin ortasinda ses / parlaklik gostergesi. */
-@Composable
-fun BoxScopeAdjustOverlay(state: AdjustState, modifier: Modifier) {
-    if (state.label.isEmpty()) return
-    Text(
-        state.label, color = Color.White, fontSize = 34.sp,
-        modifier = modifier
-            .background(Color(0xAA000000), RoundedCornerShape(14.dp))
-            .padding(horizontal = 24.dp, vertical = 10.dp)
-    )
 }

@@ -62,10 +62,13 @@ fun BrowseScreen(vm: AppViewModel, kind: String) {
     /** Sagdaki listede i. ogeyi ac (film oynat / dizi bolumlerini getir / bolumu oynat). */
     fun openAt(i: Int) {
         if (isSeries && eps != null) {
-            eps.getOrNull(i)?.let { vm.playVod("${vm.episodesTitle} · ${it.title}", it.url, backScreen) }
+            if (eps.getOrNull(i) != null) {
+                vm.playVodQueue(eps.map { "${vm.episodesTitle} · ${it.title}" to it.url }, i, backScreen, kind)
+            }
         } else {
             items.getOrNull(i)?.let {
-                if (isSeries) vm.openSeries(it) else vm.playVod(it.name, it.url, backScreen)
+                if (isSeries) vm.openSeries(it)
+                else vm.playVodQueue(items.map { m -> m.name to m.url }, i, backScreen, kind)
                 if (isSeries) iIdx = 0
             }
         }

@@ -16,6 +16,9 @@ import java.io.ObjectOutputStream
 /** Kaynaklar, favoriler, gizli gruplar ve onbellek burada saklanir. */
 private const val BACKUP_NAME = "iptv_backup.json"
 
+/** Yedege girmeyen ayarlar: kaynaklar ayrica yazilir; cihaza ozel olanlar (kayit planlari, guncelleme zamani). */
+private val BACKUP_EXCLUDE = setOf("sources", "active", "lastUpdateCheck", "recJobs", "recVolume")
+
 class Store(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("iptv", Context.MODE_PRIVATE)
 
@@ -144,7 +147,7 @@ class Store(private val ctx: Context) {
     /** Yedegi olusturur; nereye yazildigini dondurur. */
     fun createBackup(): String {
         val json = JSONObject().apply {
-            put("version", 1)
+            put("version", 2)
             put("timestamp", System.currentTimeMillis())
             put("activeSourceId", activeSourceId)
             put("streamExt", streamExt)
@@ -159,9 +162,33 @@ class Store(private val ctx: Context) {
                     put("host", it.host)
                     put("user", it.user)
                     put("pass", it.pass)
+                    // Cihaza yuklenmis M3U dosyasi: icerigi de yedege girer (yeni cihazda da acilsin)
+                    if (it.type == "m3ufile") {
+                        runCatching { File(it.url).takeIf { f -> f.exists() }?.readText(Charsets.UTF_8) }
+                            .getOrNull()?.let { text -> put("fileContent", text) }
+                    }
                 })
             }
             put("sources", sourcesArr)
+
+            // Tum ayarlar (tema, goruntu orani, tampon, acilis, geri tusu, liste yenileme, ses/altyazi dili,
+            // EPG saat farklari, gizli / calismayan kanallar, coklu ekran duzeni ve karolari, son kanallar ...)
+            val all = JSONObject()
+            for ((k, v) in prefs.all) {
+                if (k in BACKUP_EXCLUDE) continue
+                val o = JSONObject()
+                when (v) {
+                    is Boolean -> o.put("t", "b").put("v", v)
+                    is Int -> o.put("t", "i").put("v", v)
+                    is Long -> o.put("t", "l").put("v", v)
+                    is Float -> o.put("t", "f").put("v", v.toDouble())
+                    is String -> o.put("t", "s").put("v", v)
+                    is Set<*> -> o.put("t", "set").put("v", JSONArray(v.filterIsInstance<String>()))
+                    else -> continue
+                }
+                all.put(k, o)
+            }
+            put("prefs", all)
 
             val favArr = JSONArray()
             loadSet("fav").forEach { favArr.put(it) }
@@ -196,9 +223,19 @@ class Store(private val ctx: Context) {
             val arr = json.getJSONArray("sources")
             val list = (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
+                var url = o.optString("url")
+                // Yedekteki M3U dosyasi icerigini bu cihaza yaz
+                if (o.optString("type") == "m3ufile" && o.has("fileContent")) {
+                    runCatching {
+                        val dir = File(ctx.filesDir, "m3u").apply { mkdirs() }
+                        val f = File(dir, o.getString("id") + ".m3u")
+                        f.writeText(o.getString("fileContent"), Charsets.UTF_8)
+                        url = f.absolutePath
+                    }
+                }
                 Source(
                     o.getString("id"), o.getString("name"), o.getString("type"),
-                    o.optString("url"), o.optString("host"), o.optString("user"), o.optString("pass")
+                    url, o.optString("host"), o.optString("user"), o.optString("pass")
                 )
             }
             saveSources(list)
@@ -222,6 +259,32 @@ class Store(private val ctx: Context) {
             val arr = json.getJSONArray("hidden")
             val set = (0 until arr.length()).map { arr.getString(it) }.toSet()
             saveSet("hidden", set)
+        }
+
+        // Surum 2: tum ayarlar
+        json.optJSONObject("prefs")?.let { all ->
+            val e = prefs.edit()
+            val keys = all.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                if (k in BACKUP_EXCLUDE) continue
+                val o = all.optJSONObject(k) ?: continue
+                runCatching {
+                    when (o.optString("t")) {
+                        "b" -> e.putBoolean(k, o.getBoolean("v"))
+                        "i" -> e.putInt(k, o.getInt("v"))
+                        "l" -> e.putLong(k, o.getLong("v"))
+                        "f" -> e.putFloat(k, o.getDouble("v").toFloat())
+                        "s" -> e.putString(k, o.getString("v"))
+                        "set" -> {
+                            val a = o.getJSONArray("v")
+                            e.putStringSet(k, (0 until a.length()).map { a.getString(it) }.toHashSet())
+                        }
+                        else -> {}
+                    }
+                }
+            }
+            e.apply()
         }
 
         return true

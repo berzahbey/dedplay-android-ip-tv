@@ -703,7 +703,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 noLiveHintFor = lib
                 val movie = groups("movie").firstOrNull()?.let { itemsIn("movie", it).firstOrNull() }
                     ?: lib.movies.firstOrNull()
-                if (movie != null && movie.url.isNotEmpty()) playVod(movie.name, movie.url, Screen.MOVIES)
+                if (movie != null && movie.url.isNotEmpty()) {
+                    val g = groups("movie").firstOrNull()
+                    val list = (if (g != null) itemsIn("movie", g) else lib.movies).map { it.name to it.url }
+                    val i = list.indexOfFirst { it.second == movie.url }.coerceAtLeast(0)
+                    playVodQueue(list, i, Screen.MOVIES, "movie")
+                }
                 else openScreen(Screen.SERIES)
             }
             return
@@ -754,6 +759,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val browseGroup = HashMap<String, Int>()
     val browseItem = HashMap<String, Int>()
     val browseCol = HashMap<String, Int>()
+
+    // Film / bolum sirasi: oynaticida asagi/yukari kaydirinca ayni listedeki onceki / sonraki
+    private var vodQueue: List<Pair<String, String>> = emptyList()
+    private var vodQueueIdx = -1
+    private var vodQueueKind = ""
+
+    /** Listeden film / bolum oynatir; ayni listede onceki / sonraki icin sira hatirlanir. */
+    fun playVodQueue(list: List<Pair<String, String>>, index: Int, back: Screen, kind: String) {
+        val it = list.getOrNull(index) ?: return
+        vodQueue = list
+        vodQueueIdx = index
+        vodQueueKind = kind
+        playVod(it.first, it.second, back)
+    }
+
+    /** Ayni listedeki sonraki (+1) / onceki (-1) film / bolum. */
+    fun nextVod(delta: Int) {
+        if (vodQueue.isEmpty()) return
+        val n = vodQueueIdx + delta
+        if (n !in vodQueue.indices) { toast(if (delta > 0) "Listenin sonu" else "Listenin başı"); return }
+        if (vodQueueKind.isNotEmpty()) browseItem[vodQueueKind] = n
+        playVodQueue(vodQueue, n, vodReturn, vodQueueKind)
+        toast(vodQueue[n].first)
+    }
 
     fun playVod(title: String, url: String, back: Screen) {
         vodTitle = title
@@ -1685,6 +1714,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         favorites = store.loadSet("fav")
         hidden = store.loadSet("hidden")
         streamExt = store.streamExt
+        // Tam yedekten gelen ayarlar
+        hiddenCh = store.loadSet("hiddenCh")
+        deadCh = store.loadSet("deadCh")
+        hideDead = store.hideDead
+        resizeMode = store.resizeMode
+        bufferMode = store.bufferMode
+        startMode = store.startMode
+        backExit = store.backExit
+        refreshMode = store.refreshMode.coerceIn(0, REFRESH_LABELS.size - 1)
+        com.iptv.tv.ui.ThemeState.index = store.theme.coerceIn(0, com.iptv.tv.ui.THEMES.size - 1)
+        multiLayout = store.loadMultiLayout()
+        multiFit = store.multiFit
+        multiTiles.clear()
+        applyLanguagePrefs()
         stopPlayback()
         currentChannel = null
         liveGroup = FAV_GROUP

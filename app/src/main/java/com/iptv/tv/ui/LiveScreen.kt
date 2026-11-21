@@ -87,7 +87,7 @@ fun LiveScreen(vm: AppViewModel) {
     val gSel = groupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
     val cSel = chanIdx.coerceIn(0, (channels.size - 1).coerceAtLeast(0))
     var srcIdx by remember { mutableIntStateOf(0) }
-    val adjust = remember { AdjustState() }
+    ResetBrightnessOnExit()
     val options = playerOptions(
         vm, live = true,
         onEpg = { epgIdx = 0; panel = Panel.EPG },
@@ -321,11 +321,11 @@ fun LiveScreen(vm: AppViewModel) {
                     else openChannels()
                 },
                 onLongPress = { if (panel == Panel.NONE) openOptions() },
-                // Cift dokun: sag taraf sonraki kanal, sol taraf onceki kanal
-                // (dikey kaydirma ses / parlaklik icin kullaniliyor)
-                onDoubleTap = { x -> if (panel == Panel.NONE) vm.zap(if (x >= 0.5f) 1 else -1) },
+                onSwipeUp = { if (panel == Panel.NONE) vm.zap(1) },
+                onSwipeDown = { if (panel == Panel.NONE) vm.zap(-1) },
                 // Saga kaydir: kanallar -> gruplar -> ayarlar. Sola kaydir: geri.
-                onSwipeRight = {
+                // Secenekler acikken yatay kaydirma kapali: ses / parlaklik cubuklari surukelenebilsin
+                onSwipeRight = if (panel == Panel.OPTIONS) null else ({
                     touchBar = false
                     when (panel) {
                         Panel.NONE -> openChannels()
@@ -333,18 +333,16 @@ fun LiveScreen(vm: AppViewModel) {
                         Panel.GROUPS, Panel.MENU -> { panel = Panel.NONE; vm.openScreen(Screen.SETTINGS) }
                         else -> panel = Panel.NONE
                     }
-                },
-                onSwipeLeft = {
+                }),
+                onSwipeLeft = if (panel == Panel.OPTIONS) null else ({
                     touchBar = false
                     when (panel) {
                         Panel.NONE -> openOptions()
                         Panel.GROUPS -> openChannels()
                         else -> panel = Panel.NONE
                     }
-                }
+                })
             )
-            // touchGestures'tan SONRA: sag yari ses, sol yari parlaklik (tablet / telefon)
-            .swipeVolumeBrightness(enabled = !isTv, state = adjust)
     ) {
         // Doldur / Uzat: TextureView (her cihazda olcege uyar; TV'lerde SurfaceView bunu yok sayabiliyor).
         // Sigdir: SurfaceView (daha verimli). Yuzey turu degisince gorunum yeniden kurulur.
@@ -415,9 +413,6 @@ fun LiveScreen(vm: AppViewModel) {
                 }
             }
         }
-
-        // Ses / parlaklik gostergesi
-        BoxScopeAdjustOverlay(adjust, Modifier.align(Alignment.Center))
 
         // Kayit gostergesi
         if (vm.isRecording(vm.currentChannel)) {
@@ -539,7 +534,8 @@ fun LiveScreen(vm: AppViewModel) {
             Panel.OPTIONS -> OptionsPanel(
                 options, oSel,
                 "OK: Değiştir · ◀ / Geri: Kapat",
-                onClick = { i -> optionAt(i) }
+                onClick = { i -> optionAt(i) },
+                top = if (isTv) null else ({ VolumeBrightnessSliders() })
             )
             Panel.NONE -> if (touchBar) {
                 // Dokunmatik arac cubugu
