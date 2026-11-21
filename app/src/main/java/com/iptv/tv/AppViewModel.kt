@@ -30,6 +30,9 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.datasource.HttpDataSource
+import android.content.res.Configuration
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
@@ -178,6 +181,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var failCount = 0
     /** Cihaz bu kanalin goruntusunu cozemiyor (orn. tablette 4K HEVC): yeniden deneme yapma. */
     private var decoderBlocked = false
+    /** Android TV mi (Amlogic vb. donanim cozuculer yayina tam kare olmadan girince cokebiliyor). */
+    private val isTv = (app.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
+        Configuration.UI_MODE_TYPE_TELEVISION
+    /** Su anki oynatma canli yayin mi */
+    private var liveMode = false
+    /** Canli: yayin tam kare (IDR) beklemeden mi aciliyor (varsayilan; hizli acilis) */
+    private var liveLenient = true
+    /** TV'de cozucusu cokup tam kareyle (IDR) acilan kanallar */
+    private val strictUrls = HashSet<String>()
+    /** Donanim cozucusu coktugu icin yazilim cozucusuyle acilan kanallar */
+    private val swVideoUrls = HashSet<String>()
+    /** Ana oynaticinin kodek secicisi okur (oynatma is parcaciginda) */
+    @Volatile private var preferSwVideo = false
+    private var decoderRetries = 0
+    private var gotFrame = false
+    private var strictJob: Job? = null
+    /** Saglayici baglantiyi reddetti (407/403 vb.): daha seyrek yeniden dene */
+    private var slowRetry = false
     private var autoAudioUrl = ""
     private var freshStart = false
     private val epgFetchedAt = HashMap<String, Long>()
@@ -212,7 +233,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(b[0], b[1], b[2], b[3])
             .build()
-        return ExoPlayer.Builder(app, renderers(app))
+        // Ana oynatici: gerekirse goruntu icin yazilim cozucusunu one alir (donanim cozucusu cokunce).
+        // (Burada yerel: player sinif basinda kuruldugu icin sinif alani henuz hazir olmazdi.)
+        val codecSelector = MediaCodecSelector { mime, secure, tunneling ->
+            val list = MediaCodecSelector.DEFAULT.getDecoderInfos(mime, secure, tunneling)
+            if (preferSwVideo && mime.startsWith("video/")) list.sortedBy { if (it.softwareOnly) 0 else 1 } else list
+        }
+        return ExoPlayer.Builder(app, renderers(app).setMediaCodecSelector(codecSelector))
             .setMediaSourceFactory(
                 // DefaultDataSource: http(s) -> OkHttp, file:// (kayitlar) -> dosya
                 DefaultMediaSourceFactory(app, extractors).setDataSourceFactory(
@@ -242,21 +269,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 buffering = state == Player.STATE_BUFFERING ||
                     (state == Player.STATE_IDLE && failCount == 1 && isLiveActive())
                 if (state != Player.STATE_READY && isLiveActive() && player.playWhenReady && !decoderBlocked) {
-                    armWatch(if (state == Player.STATE_BUFFERING) 12_000L else 1_500L)
+                    armWatch(if (state == Player.STATE_BUFFERING) 12_000L else if (slowRetry) 8_000L else 1_500L)
                 }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) { playerMessage = null; failCount = 0 }
+                if (isPlaying) { playerMessage = null; failCount = 0; slowRetry = false }
                 updateSessionState(isPlaying)
             }
 
             override fun onPlayerError(error: PlaybackException) {
                 // Uzantisiz HLS adresi: ayni adresi HLS olarak hemen yeniden ac
                 if (markHlsIfUnrecognized(playingUrl, error)) {
-                    player.setMediaItem(mediaItemFor(playingUrl))
+                    setSource(playingUrl)
                     player.prepare()
                     player.playWhenReady = true
+                    return
+                }
+                // TV: donanim goruntu cozucusu coktu (orn. Mi Box'ta 720p H.264 "HD" kanallar).
+                // Once bu kanalda yazilim cozucusune gec; yine cokerse tam kareyle (IDR) ac.
+                // Diger kanallar etkilenmez (eskisi gibi hizli acilir).
+                if (isTv && liveMode && isVideoCodecCrash(error) && decoderRetries < 2) {
+                    decoderRetries++
+                    if (!preferSwVideo) {
+                        swVideoUrls.add(playingUrl)
+                        preferSwVideo = true
+                    } else {
+                        liveLenient = false
+                        strictUrls.add(playingUrl)
+                    }
+                    reloadCurrent()
                     return
                 }
                 if (isVideoDecoderLimit(error)) {
@@ -267,15 +309,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     playerMessage = videoLimitMessage(error)
                     return
                 }
+                val reason = errorReason(error)
                 if (screen == Screen.LIVE) {
+                    failCount++
+                    if (isRefused(error)) {
+                        // Saglayici reddediyor (cogu zaman baglanti limiti): 1,5 sn'de bir zorlama
+                        slowRetry = true
+                        buffering = false
+                        playerMessage = "Sağlayıcı bağlantıyı reddetti ($reason)\nBağlantı limiti dolmuş olabilir – yeniden deneniyor…"
+                        armWatch(8_000L)
+                        return
+                    }
                     // Canli yayinda bekci (armWatch) 1,5 sn sonra kanali yeniden acar.
                     // Ilk hatada uyari gosterme (cogu sunucu ikinci denemede acar), sadece yukleniyor simgesi.
-                    failCount++
                     buffering = failCount < 2
-                    if (failCount >= 2) playerMessage = "Yayın açılamadı – yeniden deneniyor…"
+                    if (failCount >= 2) playerMessage = "Yayın açılamadı ($reason) – yeniden deneniyor…"
                 } else {
                     buffering = false
-                    playerMessage = "Yayın açılamadı"
+                    playerMessage = "Yayın açılamadı ($reason)"
                 }
             }
 
@@ -290,6 +341,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             override fun onRenderedFirstFrame() {
+                gotFrame = true
                 updateMediaInfo()
             }
         })
@@ -635,8 +687,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun isLiveActive() = screen == Screen.LIVE && playingUrl.isNotEmpty()
 
-    private fun play(url: String) {
+    private fun play(url: String, live: Boolean = false) {
         playingUrl = url
+        liveMode = live
+        liveLenient = url !in strictUrls
+        preferSwVideo = url in swVideoUrls
+        decoderRetries = 0
+        slowRetry = false
         playerMessage = null
         lastFrames = -1
         failCount = 0
@@ -646,9 +703,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mediaInfo = ""
         // Onceki kanalin ses/altyazi secimi yeni kanala tasinmasin (dil tercihi kalir)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
-        player.setMediaItem(mediaItemFor(url))
+        setSource(url)
         player.prepare()
         player.playWhenReady = true
+    }
+
+    /**
+     * Kaynagi oynaticiya verir. Normalde eskisi gibi (esnek, hizli). Sadece TV'de cozucusu coken
+     * kanallar tam kareyle (IDR) acilir; 5 sn icinde goruntu gelmezse esnek moda geri donulur.
+     */
+    private fun setSource(url: String) {
+        gotFrame = false
+        strictJob?.cancel()
+        if (!(isTv && liveMode) || liveLenient) {
+            player.setMediaItem(mediaItemFor(url))
+            return
+        }
+        player.setMediaSource(tileMediaSource(url, false))
+        strictJob = viewModelScope.launch {
+            repeat(4) {
+                delay(5_000L)
+                if (gotFrame || playingUrl != url || liveLenient || !liveMode) return@launch
+                if (player.playbackState == Player.STATE_READY) {
+                    liveLenient = true
+                    strictUrls.remove(url)
+                    reloadCurrent()
+                    return@launch
+                }
+            }
+        }
     }
 
     // ---------- HLS tanima ----------
@@ -685,7 +768,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         currentChannel = item
         store.setLastChannel(activeId, item.id)
         updateSessionTitle(item.name)
-        play(liveUrl(item))
+        play(liveUrl(item), live = true)
     }
 
     /** Bir onceki izlenen kanala doner. */
@@ -763,7 +846,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (playingUrl != liveUrl(ch)) {
             store.setLastChannel(activeId, ch.id)
             updateSessionTitle(ch.name)
-            play(liveUrl(ch))
+            play(liveUrl(ch), live = true)
         }
     }
 
@@ -935,13 +1018,60 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "video/avc" -> "H.264"
             else -> f?.sampleMimeType?.removePrefix("video/")?.uppercase() ?: ""
         }
-        return "Bu cihaz bu kanalın ${res}görüntüsünü ($codec) çözemiyor.\nKanalın HD / FHD sürümünü deneyin."
+        return if (res.isNotEmpty()) "Bu cihaz bu kanalın ${res}görüntüsünü ($codec) çözemiyor.\nKanalın HD / FHD sürümünü deneyin."
+        else "Bu cihaz bu kanalın görüntüsünü ($codec) çözemedi."
+    }
+
+    /** Donanim cozucusu yayin sirasinda coktu mu (4K / desteklenmeyen format degil). */
+    private fun isVideoCodecCrash(e: PlaybackException): Boolean {
+        if (e.errorCode != PlaybackException.ERROR_CODE_DECODING_FAILED &&
+            e.errorCode != PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) return false
+        val f = (e as? ExoPlaybackException)?.rendererFormat ?: return false
+        return f.sampleMimeType?.startsWith("video/") == true && f.height < 2000
+    }
+
+    private fun httpCode(e: Throwable): Int? {
+        var t: Throwable? = e
+        var depth = 0
+        while (t != null && depth < 10) {
+            val cur: Throwable = t
+            if (cur is HttpDataSource.InvalidResponseCodeException) return cur.responseCode
+            val msg = cur.message ?: ""
+            if (msg.contains("HTTP", true)) {
+                val m = Regex("[(]([0-9]{3})[)]").find(msg)
+                if (m != null) return m.groupValues[1].toInt()
+            }
+            t = cur.cause; depth++
+        }
+        return null
+    }
+
+    /** Saglayici erisimi reddetti mi (baglanti limiti, yetki, engel). */
+    private fun isRefused(e: PlaybackException): Boolean = httpCode(e) in setOf(401, 403, 407, 429, 458, 509)
+
+    /** Hata icin kisa, okunur sebep (mesajlara eklenir). */
+    private fun errorReason(e: PlaybackException): String {
+        httpCode(e)?.let { return "HTTP $it" }
+        return when (e.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "bağlantı kurulamadı"
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "zaman aşımı"
+            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "bulunamadı"
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+            PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+            PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED -> "format okunamadı"
+            PlaybackException.ERROR_CODE_DECODING_FAILED,
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "çözücü hatası"
+            PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+            PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> "ses çıkışı açılamadı"
+            PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> "yayının gerisinde kalındı"
+            else -> "kod ${e.errorCode}"
+        }
     }
 
     private fun reloadCurrent() {
         if (playingUrl.isEmpty()) return
         lastFrames = -1
-        player.setMediaItem(mediaItemFor(playingUrl))
+        setSource(playingUrl)
         player.prepare()
         player.playWhenReady = true
         armWatch(15_000L)
