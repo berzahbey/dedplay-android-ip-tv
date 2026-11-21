@@ -31,6 +31,9 @@ import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import kotlinx.coroutines.CancellationException
@@ -1402,6 +1405,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
             .setLoadControl(load)
             .build()
+    }
+
+    /**
+     * Karo icin yayin kaynagi. lenient=false: goruntu tam kareyle (IDR) baslar, acilista renk lekesi olmaz.
+     * lenient=true: tam kare gondermeyen yayinlar icin tam kareyi beklemeden baslar (karo siyah kalmasin).
+     */
+    fun tileMediaSource(url: String, lenient: Boolean): MediaSource {
+        val app = getApplication<Application>()
+        val ds = DefaultDataSource.Factory(app, OkHttpDataSource.Factory(Http.streamClient).setUserAgent(USER_AGENT))
+        val tsFlags = if (lenient)
+            DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES or DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
+        else DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
+        val item = mediaItemFor(url)
+        return if (item.localConfiguration?.mimeType == MimeTypes.APPLICATION_M3U8)
+            HlsMediaSource.Factory(ds).setExtractorFactory(DefaultHlsExtractorFactory(tsFlags, true)).createMediaSource(item)
+        else DefaultMediaSourceFactory(app, DefaultExtractorsFactory().setTsExtractorFlags(tsFlags))
+            .setDataSourceFactory(ds).createMediaSource(item)
     }
 
     /** Coklu ekrana giriste 4 karonu bir kez doldur. Sonraki girislerde kayitli secimler kalir. */

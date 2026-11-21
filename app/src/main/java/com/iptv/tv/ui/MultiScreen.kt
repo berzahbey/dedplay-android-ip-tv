@@ -71,6 +71,9 @@ fun MultiScreen(vm: AppViewModel) {
     val tiles = vm.multiTiles
     val players = remember { List(4) { vm.newTilePlayer() } }
     val urls = remember { arrayOfNulls<String>(4) }
+    // Karo once tam kareyi bekler (renk lekesi olmasin); 5 sn'de goruntu gelmezse beklemeden baslar
+    val lenient = remember { BooleanArray(4) }
+    val startedAt = remember { LongArray(4) }
     val failed = remember { mutableStateListOf(false, false, false, false) }
     val loadingTile = remember { mutableStateListOf(false, false, false, false) }
     var layout by remember { mutableIntStateOf(vm.multiLayout) }
@@ -121,7 +124,7 @@ fun MultiScreen(vm: AppViewModel) {
                     // Uzantisiz HLS adresi: HLS olarak hemen yeniden ac
                     val u = urls[i]
                     if (u != null && vm.markHlsIfUnrecognized(u, error)) {
-                        p.setMediaItem(vm.mediaItemFor(u))
+                        p.setMediaSource(vm.tileMediaSource(u, lenient[i]))
                         p.prepare()
                         p.playWhenReady = true
                         return
@@ -146,7 +149,9 @@ fun MultiScreen(vm: AppViewModel) {
             } else if (urls[i] != url) {
                 urls[i] = url
                 failed[i] = false
-                p.setMediaItem(vm.mediaItemFor(url))
+                lenient[i] = false
+                startedAt[i] = System.currentTimeMillis()
+                p.setMediaSource(vm.tileMediaSource(url, lenient = false))
                 p.prepare()
                 p.playWhenReady = true
             }
@@ -160,6 +165,27 @@ fun MultiScreen(vm: AppViewModel) {
                     failed[i] = false
                     players[i].prepare()
                     players[i].playWhenReady = true
+                }
+            }
+        }
+    }
+    // 5 sn icinde hic kare cizilmediyse (tam kare gondermeyen yayin) karoyu "beklemeden basla" moduna al
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1_000)
+            val now = System.currentTimeMillis()
+            for (i in 0 until 4) {
+                val u = urls[i] ?: continue
+                if (lenient[i] || now - startedAt[i] < 5_000) continue
+                val p = players[i]
+                if (!p.playWhenReady || p.playbackState == Player.STATE_ENDED) continue
+                val c = p.videoDecoderCounters
+                c?.ensureUpdated()
+                if ((c?.renderedOutputBufferCount ?: 0) == 0) {
+                    lenient[i] = true
+                    p.setMediaSource(vm.tileMediaSource(u, lenient = true))
+                    p.prepare()
+                    p.playWhenReady = true
                 }
             }
         }
