@@ -113,7 +113,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var hiddenCh by mutableStateOf(store.loadSet("hiddenCh"))
     /** M3U taramasinda yayin vermedigi gorulen kanallar: "kaynakId|kanalId" */
     var deadCh by mutableStateOf(store.loadSet("deadCh"))
-    var hideDead by mutableStateOf(store.hideDead)
+    /** "Calismayanlari gizle" hangi listelerde acik (liste bazinda; kaynak id'leri). */
+    var hideDeadSrc by mutableStateOf(initHideDeadSrc())
+    /** Aktif listede calismayan kanallar gizli mi? */
+    val hideDead: Boolean get() = activeId in hideDeadSrc
+
+    private fun initHideDeadSrc(): Set<String> {
+        val set = store.loadSet("hideDeadSrc")
+        // Eski surumde tek ve ortak ayardi: acikti ise tum M3U listelerinde acik say
+        if (set.isEmpty() && store.hideDead) {
+            val all = store.loadSources().filter { it.type == "m3u" || it.type == "m3ufile" }.map { it.id }.toSet()
+            store.saveSet("hideDeadSrc", all)
+            store.hideDead = false
+            return all
+        }
+        return set
+    }
     /** Tarama surerken ilerleme yazisi, yoksa null. */
     var scanProgress by mutableStateOf<String?>(null)
     /** GitHub'da daha yeni surum varsa bilgisi. */
@@ -421,6 +436,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Herhangi bir kaynagi siler (aktifse bir sonrakine gecer); coklu ekrandaki karolarindan da cikarir. */
     fun deleteSource(id: String) {
         if (id == activeId) deleteActive() else removeSource(id)
+        if (id in hideDeadSrc) { hideDeadSrc = hideDeadSrc - id; store.saveSet("hideDeadSrc", hideDeadSrc) }
+        val p = "$id|"
+        if (deadCh.any { it.startsWith(p) }) { deadCh = deadCh.filterNot { it.startsWith(p) }.toSet(); store.saveSet("deadCh", deadCh) }
         var changed = false
         for (i in multiTiles.indices) {
             if (multiTiles[i]?.sourceId == id) { multiTiles[i] = null; changed = true }
@@ -538,7 +556,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun itemsIn(kind: String, group: String): List<Item> {
-        library; favorites; hiddenCh; deadCh; hideDead
+        library; favorites; hiddenCh; deadCh; hideDeadSrc; activeId
         if (kind == "live") return visibleLive(group, liveBase(group))
         return idx[kind]?.get(group) ?: emptyList()
     }
@@ -1348,7 +1366,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Secicideki kaynak + grup icin ogeler (gizli / calismayan kanallar uygulanir).
      *  contentType: "canli", "film" veya "dizi" */
     fun multiPickItems(contentType: String, group: String): List<Item> {
-        multiPickSourceId; multiExtraLib; favorites; hidden; hiddenCh; deadCh; hideDead
+        multiPickSourceId; multiExtraLib; favorites; hidden; hiddenCh; deadCh; hideDeadSrc
         val lib = multiPickLibrary() ?: return emptyList()
         val sourceId = multiPickSourceId
         val p = "$sourceId|"
@@ -1365,7 +1383,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> pool.filter { it.group == group }
         }
         val hc = hiddenCh
-        val dc = if (hideDead) deadCh else emptySet()
+        // Coklu ekran seciciden bakilan listenin kendi "gizle" ayari
+        val dc = if (sourceId in hideDeadSrc) deadCh else emptySet()
         if (hc.none { it.startsWith(p) } && dc.none { it.startsWith(p) }) return base
         return base.filter { "$p${it.id}" !in hc && "$p${it.id}" !in dc }
     }
@@ -1620,9 +1639,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggleHideDead() {
-        hideDead = !hideDead
-        store.hideDead = hideDead
-        toast(if (hideDead) "Çalışmayan kanallar gizlendi" else "Çalışmayan kanallar gösteriliyor")
+        val id = activeId
+        hideDeadSrc = if (id in hideDeadSrc) hideDeadSrc - id else hideDeadSrc + id
+        store.saveSet("hideDeadSrc", hideDeadSrc)
+        val name = activeSource()?.name ?: ""
+        toast(if (hideDead) "$name: çalışmayan kanallar gizlendi" else "$name: çalışmayan kanallar gösteriliyor")
     }
 
     fun clearDead() {
@@ -1737,7 +1758,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Tam yedekten gelen ayarlar
         hiddenCh = store.loadSet("hiddenCh")
         deadCh = store.loadSet("deadCh")
-        hideDead = store.hideDead
+        hideDeadSrc = initHideDeadSrc()
         resizeMode = store.resizeMode
         bufferMode = store.bufferMode
         startMode = store.startMode

@@ -62,11 +62,11 @@ fun SettingsScreen(vm: AppViewModel) {
     // Satir ve islem ayni yerde: siralama degisse de karismaz
     // M3U kaynaginda: calismayan kanal taramasi
     val scanItems: List<OptionItem> = if (!vm.isM3uSource()) emptyList() else listOf(
-        OptionItem(ListRow("Çalışmayan kanalları bul (M3U)",
+        OptionItem(ListRow("Çalışmayan kanalları bul · " + (src?.name ?: "bu liste"),
             sub = vm.scanProgress?.let { "Taranıyor: $it · durdurmak için OK" } ?: "${vm.deadCount()} çalışmıyor · taramak için OK")) {
             vm.toggleDeadScan()
         },
-        OptionItem(ListRow("Çalışmayan kanalları gizle", sub = if (vm.hideDead) "Açık" else "Kapalı")) { vm.toggleHideDead() }
+        OptionItem(ListRow("Çalışmayan kanalları gizle · " + (src?.name ?: "bu liste"), sub = if (vm.hideDead) "Açık (sadece bu liste)" else "Kapalı (sadece bu liste)")) { vm.toggleHideDead() }
     )
 
     // Guncelleme satiri: yeni surum varsa listenin en ustunde, yoksa en altta
