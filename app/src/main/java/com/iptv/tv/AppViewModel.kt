@@ -259,6 +259,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 else if (s == Screen.LIVE) store.lastScreenMulti = false
             }
         }
+        store.cleanupOldCaches()
         Recorder.load(app)
         Recorder.ensureService(app)
         setupMediaSession()
@@ -763,6 +764,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playLive(item: Item) {
+        // Film / dizi ogesi canli TV ekraninda acilmasin: film oynaticisinda (sarma, duraklatma) ac
+        if (item.kind == "movie" || item.kind == "series") {
+            playVod(item.name, item.url, if (screen == Screen.MULTI) Screen.MULTI else Screen.MOVIES)
+            return
+        }
         val cur = currentChannel
         if (cur != null && cur.id != item.id) previousChannel = cur
         currentChannel = item
@@ -1613,6 +1619,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val item = ch?.item
         if (item == null) { screen = Screen.LIVE; return }
         if (ch.sourceId != activeId && sources.any { it.id == ch.sourceId }) setActive(ch.sourceId)
+        if (item.kind == "movie" || item.kind == "series") {
+            playVod(item.name, item.url, Screen.MULTI)
+            return
+        }
         screen = Screen.LIVE
         liveGroup = item.group
         playLive(item)

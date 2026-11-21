@@ -350,7 +350,11 @@ class Store(private val ctx: Context) {
     }
 
     // ----- onbellek -----
-    private fun cacheFile(sourceId: String) = File(ctx.cacheDir, "lib_$sourceId.bin")
+    /**
+     * Liste onbellegi. Ayristirici (M3uParser) degisince surum artirilir: eski surumle okunmus
+     * listeler (orn. v1.9.30 oncesi type="video" filmlerin canli kanal sanilmasi) bir kez yeniden okunur.
+     */
+    private fun cacheFile(sourceId: String) = File(ctx.cacheDir, "lib${LIB_CACHE_VERSION}_$sourceId.bin")
 
     fun saveLibrary(sourceId: String, lib: Library) {
         runCatching {
@@ -367,6 +371,16 @@ class Store(private val ctx: Context) {
     }.getOrNull()
 
     fun clearCache(sourceId: String) { cacheFile(sourceId).delete() }
+
+    /** Eski surum onbellek dosyalarini siler (yer kaplamasin). */
+    fun cleanupOldCaches() {
+        runCatching {
+            ctx.cacheDir.listFiles()?.forEach { f ->
+                val n = f.name
+                if (n.endsWith(".bin") && n.startsWith("lib") && !n.startsWith("lib${LIB_CACHE_VERSION}_")) f.delete()
+            }
+        }
+    }
 
     // ---------- Coklu ekran karo secimi kaliciligi ----------
     /** Coklu ekrandaki her karo icin secilen kaynak + kanal kalici olarak saklanir. */

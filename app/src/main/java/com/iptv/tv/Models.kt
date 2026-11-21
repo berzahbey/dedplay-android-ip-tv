@@ -69,6 +69,9 @@ const val USER_AGENT = "IPTVSmartersPro"
 
 /** Liste otomatik yenileme araligi (7 gun). Elle: Ayarlar > Listeyi yenile. */
 /** Otomatik liste yenileme secenekleri (Ayarlar). -1 = kapali, sadece elle. */
+/** Liste onbellek surumu: M3U ayristirma kurallari degisince artir. */
+const val LIB_CACHE_VERSION = 2
+
 val REFRESH_LABELS = listOf("Her açılışta", "Günde bir", "3 günde bir", "Haftada bir", "Kapalı (sadece elle)")
 private const val DAY_MS = 24L * 3600 * 1000
 val REFRESH_MS = listOf(0L, DAY_MS, 3 * DAY_MS, 7 * DAY_MS, -1L)
