@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -102,7 +103,7 @@ fun MultiScreen(vm: AppViewModel) {
         ListRow("Düzen: " + (if (layout == 2) "2'li" else "4'lü"), sub = "Karo sayısını değiştir"),
         ListRow("Kaynak: " + vm.sourceName(vm.multiPickSourceId), sub = "Farklı M3U/Xtream kaynağı seç"),
         ListRow("İçerik: " + pickContent, sub = "Canlı / Film / Dizi seç"),
-        ListRow("Görüntü: " + MULTI_FIT_LABELS[vm.multiFit], sub = "Karoyu doldur / sığdır / uzat")
+        ListRow("Görüntü: " + fitLabel(vm.multiFit), sub = "OK: sıradaki")
     )
 
     val fr = remember { FocusRequester() }
@@ -183,9 +184,20 @@ fun MultiScreen(vm: AppViewModel) {
         ListRow("⊞ Düzen: " + (if (layout == 2) "2'li" else "4'lü") + "  (OK ile değiştir)"),
         ListRow("Kaynak: ${vm.sourceName(vm.multiPickSourceId)}  (OK ile değiştir)"),
         ListRow("İçerik: $pickContent  (OK ile değiştir)"),
-        ListRow("Görüntü: ${MULTI_FIT_LABELS[vm.multiFit]}  (OK ile değiştir)")
+        ListRow("Görüntü: " + fitLabel(vm.multiFit) + "  (OK ile değiştir)")
     )
     val pSel = pickIdx.coerceIn(0, (pickTopRows.size - 1).coerceAtLeast(0))
+
+    LaunchedEffect(picker, vm.multiPickSourceId, vm.multiPickBusy()) {
+        if (!picker || vm.multiPickBusy()) return@LaunchedEffect
+        if (vm.multiPickHasContent(pickContent) == false) {
+            listOf("canli", "film", "dizi").firstOrNull { vm.multiPickHasContent(it) == true }?.let {
+                pickContent = it
+                pickGroupIdx = 1
+                pickChanIdx = 0
+            }
+        }
+    }
 
     fun moveFocus(dx: Int, dy: Int) {
         if (layout == 2) {
@@ -247,6 +259,15 @@ fun MultiScreen(vm: AppViewModel) {
         } else {
             vm.openScreen(Screen.LIVE)
         }
+    }
+
+    /** Kaynak secildi: gruplar listesini ac, "Tümü" grubu secili (Favoriler yeni listede bos olur). */
+    fun selectSource(id: String) {
+        vm.beginMultiPick(id)
+        pickSourceIdx = vm.sources.indexOfFirst { it.id == id }.coerceAtLeast(0)
+        pickGroupIdx = 1
+        pickChanIdx = 0
+        pickMode = PickMode.GROUPS
     }
 
     fun pickAt(i: Int) {
@@ -344,7 +365,7 @@ fun MultiScreen(vm: AppViewModel) {
                         when (pickMode) {
                             PickMode.SETTINGS -> pickMode = PickMode.GROUPS
                             PickMode.GROUPS -> { pickMode = PickMode.CHANNELS; lastPickMode = PickMode.CHANNELS }
-                            PickMode.SOURCES -> { pickMode = PickMode.CHANNELS; lastPickMode = PickMode.CHANNELS }
+                            PickMode.SOURCES -> vm.sources.getOrNull(pickSourceIdx)?.let { src -> selectSource(src.id) }
                             PickMode.CHANNELS -> {}
                             PickMode.TOP -> {}
                         }
@@ -359,13 +380,7 @@ fun MultiScreen(vm: AppViewModel) {
                         PickMode.TOP -> pickAt(pSel)
                         PickMode.GROUPS -> pickMode = PickMode.CHANNELS
                         PickMode.SOURCES -> {
-                            vm.sources.getOrNull(pickSourceIdx)?.let { src ->
-                                vm.beginMultiPick(src.id)
-                                pickSourceIdx = vm.sources.indexOfFirst { it.id == src.id }.coerceAtLeast(0)
-                                pickGroupIdx = 0
-                                pickChanIdx = 0
-                                pickMode = PickMode.CHANNELS
-                            }
+                            vm.sources.getOrNull(pickSourceIdx)?.let { src -> selectSource(src.id) }
                         }
                         PickMode.CHANNELS -> {
                             pickList.getOrNull(pickChanIdx)?.let {
@@ -486,10 +501,7 @@ fun MultiScreen(vm: AppViewModel) {
                                 subSize = txtSize(12f),
                                 onClick = { i ->
                                     pickSourceIdx = i
-                                    vm.sources.getOrNull(i)?.let { src ->
-                                        vm.beginMultiPick(src.id)
-                                        pickMode = PickMode.CHANNELS
-                                    }
+                                    vm.sources.getOrNull(i)?.let { src -> selectSource(src.id) }
                                 }
                             )
                             Text(
@@ -508,6 +520,7 @@ fun MultiScreen(vm: AppViewModel) {
                             TvList(
                                 chanRows, pickChanIdx,
                                 Modifier.weight(1f),
+                                emptyText = if (vm.multiPickBusy()) "Liste yükleniyor…" else "Bu grupta öğe yok · Sol: gruplar",
                                 rowHeight = rowHeightDp(44),
                                 textSize = txtSize(16f),
                                 subSize = txtSize(12f),
@@ -602,12 +615,13 @@ private fun Tile(
 
     Box(
         modifier
+            .clipToBounds()
             .touchGestures(onTap = onTap, onLongPress = onLongPress)
             .then(if (focused && showUi) Modifier.border(4.dp, Accent) else Modifier)
             .background(Color.Black)
     ) {
         if (item != null) {
-            PlayerSurface(player, resizeMode)
+            PlayerSurface(player, resizeMode, clipToTile = true)
             if (loading || failed) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center), color = Accent)
             }
@@ -659,3 +673,7 @@ private fun BarChip(text: String, onClick: () -> Unit) {
             .padding(horizontal = padSizeDp(12), vertical = padSizeDp(6))
     )
 }
+
+/** "Sığdır · [Doldur] · Uzat": secili secenek koseli parantezle gosterilir. */
+private fun fitLabel(sel: Int): String =
+    MULTI_FIT_LABELS.mapIndexed { i, l -> if (i == sel) "[$l]" else l }.joinToString(" · ")

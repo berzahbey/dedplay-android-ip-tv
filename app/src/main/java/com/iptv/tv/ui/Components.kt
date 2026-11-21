@@ -427,11 +427,27 @@ fun PanelHeader(text: String) {
 
 /** ExoPlayer goruntu yuzeyi (kontroller kapali, odak almaz). */
 @Composable
-fun PlayerSurface(player: Player, resizeMode: Int = 0, modifier: Modifier = Modifier.fillMaxSize()) {
+fun PlayerSurface(
+    player: Player,
+    resizeMode: Int = 0,
+    modifier: Modifier = Modifier.fillMaxSize(),
+    /** true: TextureView (karo sinirlarina uyar, coklu ekran icin). false: SurfaceView (tam ekran, daha verimli). */
+    clipToTile: Boolean = false
+) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            PlayerView(ctx).apply {
+            if (clipToTile) {
+                (android.view.LayoutInflater.from(ctx).inflate(com.iptv.tv.R.layout.tile_player_view, null) as PlayerView).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    useController = false
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    this.player = player
+                }
+            } else PlayerView(ctx).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                 )

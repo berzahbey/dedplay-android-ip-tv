@@ -674,8 +674,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Canli TV ekrani acilinca kanali baslatir. */
+    private var noLiveHintFor: Library? = null
+
     fun ensureLive() {
         val lib = library ?: return
+        // Sadece film / dizi iceren liste (orn. film M3U'su): Canli TV bos, kullaniciya yolu goster
+        if (lib.live.isEmpty() && (lib.movies.isNotEmpty() || lib.series.isNotEmpty())) {
+            if (noLiveHintFor !== lib) {
+                noLiveHintFor = lib
+                toast("Bu listede canlı kanal yok · Menü > Filmler / Diziler")
+            }
+            return
+        }
         if (freshStart) {
             freshStart = false
             if (startMode == 0) {
@@ -883,9 +893,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Turkce yoksa ikinci tercih Ingilizce; ikisi de yoksa yayinin varsayilan sesi
         b.setPreferredAudioLanguages(store.audioLang, "en")
         when (val s = store.subLang) {
-            "" -> {}
-            "off" -> b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-            else -> b.setPreferredTextLanguage(s)
+            // Altyazi dili secilmediyse yayinin "varsayilan" isaretli altyazisi kendiliginden
+            // acilmasin (orn. listede Sesotho varsayilan isaretli); zorunlu (forced) altyazilar kalir.
+            "" -> b.setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            "off" -> b.setIgnoredTextSelectionFlags(0).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            else -> b.setIgnoredTextSelectionFlags(0).setPreferredTextLanguage(s)
         }
         player.trackSelectionParameters = b.build()
     }
@@ -1291,6 +1303,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val dc = if (hideDead) deadCh else emptySet()
         if (hc.none { it.startsWith(p) } && dc.none { it.startsWith(p) }) return base
         return base.filter { "$p${it.id}" !in hc && "$p${it.id}" !in dc }
+    }
+
+    /** Secicideki kaynakta bu turde (canli / film / dizi) icerik var mi? Liste yuklenmediyse null. */
+    fun multiPickHasContent(contentType: String): Boolean? {
+        multiPickSourceId; multiExtraLib
+        val lib = multiPickLibrary() ?: return null
+        return when (contentType) {
+            "film" -> lib.movies.isNotEmpty()
+            "dizi" -> lib.series.isNotEmpty()
+            else -> lib.live.isNotEmpty()
+        }
     }
 
     fun cycleMultiPickSource() {
