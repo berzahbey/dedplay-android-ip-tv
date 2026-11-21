@@ -50,6 +50,7 @@ import com.iptv.tv.AppViewModel
 import com.iptv.tv.FAV_GROUP
 import com.iptv.tv.Item
 import com.iptv.tv.MultiChannel
+import com.iptv.tv.MULTI_FIT_LABELS
 import com.iptv.tv.Screen
 import kotlinx.coroutines.delay
 
@@ -100,7 +101,8 @@ fun MultiScreen(vm: AppViewModel) {
     val settingRows = listOf(
         ListRow("Düzen: " + (if (layout == 2) "2'li" else "4'lü"), sub = "Karo sayısını değiştir"),
         ListRow("Kaynak: " + vm.sourceName(vm.multiPickSourceId), sub = "Farklı M3U/Xtream kaynağı seç"),
-        ListRow("İçerik: " + pickContent, sub = "Canlı / Film / Dizi seç")
+        ListRow("İçerik: " + pickContent, sub = "Canlı / Film / Dizi seç"),
+        ListRow("Görüntü: " + MULTI_FIT_LABELS[vm.multiFit], sub = "Karoyu doldur / sığdır / uzat")
     )
 
     val fr = remember { FocusRequester() }
@@ -114,6 +116,14 @@ fun MultiScreen(vm: AppViewModel) {
                     if (state == Player.STATE_READY) failed[i] = false
                 }
                 override fun onPlayerError(error: PlaybackException) {
+                    // Uzantisiz HLS adresi: HLS olarak hemen yeniden ac
+                    val u = urls[i]
+                    if (u != null && vm.markHlsIfUnrecognized(u, error)) {
+                        p.setMediaItem(vm.mediaItemFor(u))
+                        p.prepare()
+                        p.playWhenReady = true
+                        return
+                    }
                     failed[i] = true
                 }
             }.also { p.addListener(it) }
@@ -134,7 +144,7 @@ fun MultiScreen(vm: AppViewModel) {
             } else if (urls[i] != url) {
                 urls[i] = url
                 failed[i] = false
-                p.setMediaItem(MediaItem.fromUri(url))
+                p.setMediaItem(vm.mediaItemFor(url))
                 p.prepare()
                 p.playWhenReady = true
             }
@@ -172,7 +182,8 @@ fun MultiScreen(vm: AppViewModel) {
     val pickTopRows = listOf(
         ListRow("⊞ Düzen: " + (if (layout == 2) "2'li" else "4'lü") + "  (OK ile değiştir)"),
         ListRow("Kaynak: ${vm.sourceName(vm.multiPickSourceId)}  (OK ile değiştir)"),
-        ListRow("İçerik: $pickContent  (OK ile değiştir)")
+        ListRow("İçerik: $pickContent  (OK ile değiştir)"),
+        ListRow("Görüntü: ${MULTI_FIT_LABELS[vm.multiFit]}  (OK ile değiştir)")
     )
     val pSel = pickIdx.coerceIn(0, (pickTopRows.size - 1).coerceAtLeast(0))
 
@@ -188,9 +199,17 @@ fun MultiScreen(vm: AppViewModel) {
 
     fun openPicker() {
         val cur = tiles.getOrNull(focus)
-        // Bos karoda veya kanali yoksa secilecek yok
-        if (cur == null || cur.item == null || cur.item.id.isEmpty()) {
-            vm.toast("Bu karoda kanal yok. Once kaynak secin.")
+        // Bos karo: son kullanilan (yoksa aktif) kaynagin gruplariyla ac, kanal secilebilsin
+        if (cur == null || cur.item.id.isEmpty()) {
+            val srcId = vm.multiPickSourceId.ifEmpty { vm.activeId }
+            vm.beginMultiPick(srcId)
+            pickContent = "canli"
+            pickMode = PickMode.GROUPS
+            pickSourceIdx = vm.sources.indexOfFirst { it.id == vm.multiPickSourceId }.coerceAtLeast(0)
+            val gs = vm.multiPickGroups(pickContent)
+            pickGroupIdx = pickGroupIdx.coerceIn(0, (gs.size - 1).coerceAtLeast(0))
+            pickChanIdx = 0
+            picker = true
             return
         }
         try {
@@ -253,6 +272,7 @@ fun MultiScreen(vm: AppViewModel) {
                 pickGroupIdx = 0
                 pickChanIdx = 0
             }
+            3 -> vm.cycleMultiFit()
         }
     }
 
@@ -376,7 +396,8 @@ fun MultiScreen(vm: AppViewModel) {
                             showUi = active || picker,
                             loading = loadingTile[i],
                             failed = failed[i],
-                            resizeMode = vm.resizeMode,
+                            // Karolar ekrani doldursun (Ayar: secicide "Görüntü")
+                            resizeMode = vm.multiFit,
                             // TV'de 2'li kâro ise görüntüyü kâro içine maksimum boyutta yerleştir
                             modifier = if (isTv && layout == 2) Modifier.weight(1f).fillMaxHeight().padding(0.dp)
                             else Modifier.weight(1f).fillMaxHeight().padding(2.dp),

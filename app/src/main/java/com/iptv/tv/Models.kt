@@ -81,3 +81,6 @@ val SLEEP_OPTIONS = listOf(0, 30, 60, 90, 120)
 
 /** Bu ekranlar acilinca canli kanal durdurulmaz, sessizce arkada calar (donunce aninda devam). */
 val KEEP_LIVE_SCREENS = setOf(Screen.SETTINGS, Screen.MANAGE_GROUPS, Screen.SEARCH, Screen.RECORDINGS)
+
+/** Coklu ekran karo goruntusu secenekleri. */
+val MULTI_FIT_LABELS = listOf("Sığdır", "Doldur", "Uzat")

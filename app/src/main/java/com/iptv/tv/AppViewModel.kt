@@ -18,6 +18,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
@@ -225,6 +226,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                // Uzantisiz HLS adresi: ayni adresi HLS olarak hemen yeniden ac
+                if (markHlsIfUnrecognized(playingUrl, error)) {
+                    player.setMediaItem(mediaItemFor(playingUrl))
+                    player.prepare()
+                    player.playWhenReady = true
+                    return
+                }
                 if (isVideoDecoderLimit(error)) {
                     // Yeniden denemek ise yaramaz: cihazin donanimi bu goruntuyu cozemiyor
                     decoderBlocked = true
@@ -588,7 +596,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun isLiveActive() = screen == Screen.LIVE && playingUrl.isNotEmpty()
 
-    private fun play(url: String, headers: Map<String, String> = emptyMap()) {
+    private fun play(url: String) {
         playingUrl = url
         playerMessage = null
         lastFrames = -1
@@ -597,52 +605,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         liveInBackground = false
         player.volume = 1f
         mediaInfo = ""
+        // Onceki kanalin ses/altyazi secimi yeni kanala tasinmasin (dil tercihi kalir)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverrides().build()
-        viewModelScope.launch {
-            val resolved = resolveStreamUrl(url)
-            withContext(Dispatchers.Main) {
-                if (resolved != url) playingUrl = resolved
-                player.setMediaItem(MediaItem.fromUri(resolved))
-                player.prepare()
-                player.playWhenReady = true
-            }
-        }
+        player.setMediaItem(mediaItemFor(url))
+        player.prepare()
+        player.playWhenReady = true
     }
 
-    /** HLS master playlist'i cozer, en yuksek bant genisligindeki media playlist URL'sini dondurur. */
-    private suspend fun resolveStreamUrl(url: String): String = withContext(Dispatchers.IO) {
-        try {
-            val req = okhttp3.Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
-            Http.client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@use url
-                val body = resp.body ?: return@use url
-                val text = body.string()
-                val lines = text.lines()
-                var bestBw = 0L
-                var bestUrl: String? = null
-                var i = 0
-                while (i < lines.size) {
-                    val line = lines[i].trim()
-                    if (line.startsWith("#EXT-X-STREAM-INF:", ignoreCase = true) && "I-FRAME" !in line) {
-                        val bwMatch = Regex("BANDWIDTH=(\d+)").find(line)
-                        val bw = bwMatch?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
-                        if (i + 1 < lines.size) {
-                            val next = lines[i + 1].trim()
-                            if (next.isNotEmpty() && !next.startsWith("#") && bw > bestBw) {
-                                bestBw = bw
-                                bestUrl = next
-                            }
-                        }
-                        i += 2
-                    } else {
-                        i += 1
-                    }
-                }
-                bestUrl ?: url
-            }
-        } catch (e: Exception) {
-            url
-        }
+    // ---------- HLS tanima ----------
+    // Uzantisi olmayan (orn. M3U film linkleri) HLS adresleri ExoPlayer tarafindan taninmaz.
+    // Icerigi onceden indirmek yerine (canli TS akislarinda bitmez ve fazladan baglanti acar)
+    // once normal acilir; "taninmayan format" hatasi gelirse ayni adres HLS olarak yeniden denenir.
+    private val hlsUrls = HashSet<String>()
+
+    /** Adres icin MediaItem: .m3u8 veya daha once HLS oldugu anlasilan adreslere HLS tipi verilir. */
+    fun mediaItemFor(url: String): MediaItem =
+        if (url in hlsUrls || url.substringBefore('?').lowercase().endsWith(".m3u8"))
+            MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build()
+        else MediaItem.fromUri(url)
+
+    /** Taninmayan format hatasinda adresi HLS olarak isaretler; ilk kez isaretlendiyse true. */
+    fun markHlsIfUnrecognized(url: String?, e: PlaybackException): Boolean {
+        if (url.isNullOrEmpty()) return false
+        if (e.errorCode != PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED) return false
+        return hlsUrls.add(url)
     }
 
     private fun stopPlayback() {
@@ -658,9 +644,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val cur = currentChannel
         if (cur != null && cur.id != item.id) previousChannel = cur
         currentChannel = item
-        store.lastChannelId = item.id
+        store.setLastChannel(activeId, item.id)
         updateSessionTitle(item.name)
-        play(liveUrl(item), playbackHeaders)
+        play(liveUrl(item))
     }
 
     /** Bir onceki izlenen kanala doner. */
@@ -682,7 +668,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun onFreshLaunch() {
         freshStart = true
         stopPlayback()
-        if (screen != Screen.LIVE) openScreen(Screen.LIVE)
+        // Uygulamadan coklu ekrandayken cikildiysa yine coklu ekranla ac (karolar kayitli)
+        val target = if (store.lastScreenMulti && sources.isNotEmpty()) Screen.MULTI else Screen.LIVE
+        if (screen != target) openScreen(target)
     }
 
     /** Canli TV ekrani acilinca kanali baslatir. */
@@ -700,7 +688,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         var ch = currentChannel
         if (ch == null) {
-            ch = liveById[store.lastChannelId]
+            ch = liveById[store.lastChannelFor(activeId)]
             if (ch == null) {
                 val g = groups("live").firstOrNull()
                 // Gizlenen / calismayan kanallar atlanir
@@ -711,7 +699,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             liveGroup = if (ch.group in groups("live")) ch.group else (groups("live").firstOrNull() ?: FAV_GROUP)
         }
         if (playingUrl != liveUrl(ch)) {
-            store.lastChannelId = ch.id
+            store.setLastChannel(activeId, ch.id)
             updateSessionTitle(ch.name)
             play(liveUrl(ch))
         }
@@ -735,7 +723,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         stopPlayback()
-        play(url, playbackHeaders)
+        play(url)
         screen = Screen.PLAYER
     }
 
@@ -745,6 +733,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openScreen(s: Screen) {
+        if (s == Screen.MULTI) store.lastScreenMulti = true
+        else if (s == Screen.LIVE) store.lastScreenMulti = false
         val liveNow = (screen == Screen.LIVE || liveInBackground) && playingUrl.isNotEmpty()
         when {
             s == Screen.LIVE -> if (liveInBackground) {
@@ -862,7 +852,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun reloadCurrent() {
         if (playingUrl.isEmpty()) return
         lastFrames = -1
-        player.setMediaItem(MediaItem.fromUri(playingUrl))
+        player.setMediaItem(mediaItemFor(playingUrl))
         player.prepare()
         player.playWhenReady = true
         armWatch(15_000L)
@@ -1179,6 +1169,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Coklu ekran ----------
     var multiLayout by mutableIntStateOf(store.loadMultiLayout())
+    /** Coklu ekran karo goruntusu: 0 Sigdir, 1 Doldur (kirp), 2 Uzat. Varsayilan: Doldur. */
+    var multiFit by mutableIntStateOf(store.multiFit)
+
+    fun cycleMultiFit() {
+        multiFit = (multiFit + 1) % 3
+        store.multiFit = multiFit
+        toast("Karo görüntüsü: " + MULTI_FIT_LABELS[multiFit])
+    }
 
     /** Coklu ekran kartlari: her karo kendi kaynagini ve kanalini tutar.
      *  AppViewModel'de durdugu icin ekran gecislerinde (MULTI<->LIVE) kaybolmaz. */
@@ -1199,11 +1197,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var multiExtraSourceId: String? = null
     private var multiExtraLib by mutableStateOf<Library?>(null)
     private var multiPickJob: Job? = null
-    /** Coklu ekran oynatici icin izin basliklari (User-Agent vb.) */
-    var playbackHeaders by mutableStateOf(mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Mobile Safari/537.36",
-        "Referer" to "https://ha.vixolity.com/"
-    ))
 
     fun sourceName(id: String): String = sources.firstOrNull { it.id == id }?.name ?: "-"
 

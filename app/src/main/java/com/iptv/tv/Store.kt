@@ -56,6 +56,24 @@ class Store(private val ctx: Context) {
         get() = prefs.getString("lastChannel", "") ?: ""
         set(v) { prefs.edit().putString("lastChannel", v).apply() }
 
+    /** Her kaynak icin son izlenen kanal (kaynak degisince kendi son kanaliyla acilir). */
+    fun lastChannelFor(sourceId: String): String =
+        prefs.getString("lastCh_$sourceId", null) ?: lastChannelId
+
+    fun setLastChannel(sourceId: String, channelId: String) {
+        prefs.edit().putString("lastCh_$sourceId", channelId).putString("lastChannel", channelId).apply()
+    }
+
+    /** Uygulamadan cikilirken coklu ekran acik miydi (tekrar acilinca coklu ekranla baslar). */
+    var lastScreenMulti: Boolean
+        get() = prefs.getBoolean("lastScreenMulti", false)
+        set(v) { prefs.edit().putBoolean("lastScreenMulti", v).apply() }
+
+    /** Coklu ekran karo goruntusu: 0 Sigdir, 1 Doldur (kirp), 2 Uzat. */
+    var multiFit: Int
+        get() = prefs.getInt("multiFit", 1)
+        set(v) { prefs.edit().putInt("multiFit", v).apply() }
+
     /** 0 = Sigdir, 1 = Doldur (kirp), 2 = Uzat */
     var resizeMode: Int
         get() = prefs.getInt("resize", 0)
@@ -303,17 +321,18 @@ class Store(private val ctx: Context) {
         val text = prefs.getString("multiTiles", "") ?: ""
         if (text.isEmpty()) return emptyList()
         val arr = runCatching { JSONArray(text) }.getOrNull() ?: return emptyList()
-        return (0 until arr.length()).mapNotNull { i ->
-            val o = arr.getJSONObject(i)
-            val item = Item(
-                o.getString("itemId"),
-                o.optString("itemName"),
-                o.optString("itemLogo"),
-                o.optString("itemGroup"),
-                o.optString("itemUrl"),
-                o.optString("itemKind")
-            )
-            MultiChannel(o.getString("sourceId"), item)
+        // Bos karo (itemId bos) null olarak kalir; karolarin sirasi korunur
+        return (0 until arr.length()).map { i ->
+            runCatching {
+                val o = arr.getJSONObject(i)
+                val id = o.optString("itemId")
+                val url = o.optString("itemUrl")
+                if (id.isEmpty() || url.isEmpty()) null
+                else MultiChannel(
+                    o.optString("sourceId"),
+                    Item(id, o.optString("itemName"), o.optString("itemLogo"), o.optString("itemGroup"), url, o.optString("itemKind").ifEmpty { "live" })
+                )
+            }.getOrNull()
         }
     }
 
