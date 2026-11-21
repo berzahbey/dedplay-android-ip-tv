@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -270,8 +271,11 @@ fun padSizeDp(baseDp: Int): Dp {
 fun resizeModeOf(mode: Int): Int = when (mode) {
     1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     2 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+    else -> AspectRatioFrameLayout.RESIZE_MODE_FIT   // 0 Sigdir, 3 Yakinlastir (Sigdir + buyutme)
 }
+
+/** "Yakinlastir": videoya gomulu sinema bantlarini (2.39:1 film 16:9 karede) ekran disina iter. */
+const val ZOOM_SCALE = 1.34f
 
 /**
  * Kumanda tuslarini yakalar. OK tusuna kisa basma -> onOk, uzun basma -> onLongOk.
@@ -435,7 +439,7 @@ fun PlayerSurface(
     clipToTile: Boolean = false
 ) {
     AndroidView(
-        modifier = modifier,
+        modifier = if (resizeMode == 3) modifier.graphicsLayer(scaleX = ZOOM_SCALE, scaleY = ZOOM_SCALE) else modifier,
         factory = { ctx ->
             if (clipToTile) {
                 (android.view.LayoutInflater.from(ctx).inflate(com.iptv.tv.R.layout.tile_player_view, null) as PlayerView).apply {

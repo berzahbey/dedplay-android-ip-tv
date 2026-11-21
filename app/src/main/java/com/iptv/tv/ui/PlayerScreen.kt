@@ -22,6 +22,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -52,6 +56,10 @@ fun PlayerScreen(vm: AppViewModel) {
     var dur by remember { mutableLongStateOf(0L) }
     var hideAt by remember { mutableLongStateOf(System.currentTimeMillis() + 4000) }
     var showOptions by remember { mutableStateOf(false) }
+    var playing by remember { mutableStateOf(true) }
+    // Kumandada basilan tusa karsilik gelen ekran dugmesi kisa sure yanar
+    var flash by remember { mutableStateOf("") }
+    LaunchedEffect(flash) { if (flash.isNotEmpty()) { delay(600); flash = "" } }
     var optIdx by remember { mutableIntStateOf(0) }
     val options = playerOptions(vm, live = false)
     val oSel = optIdx.coerceIn(0, (options.size - 1).coerceAtLeast(0))
@@ -61,6 +69,7 @@ fun PlayerScreen(vm: AppViewModel) {
         while (true) {
             pos = player.currentPosition
             dur = player.duration.coerceAtLeast(0)
+            playing = player.playWhenReady
             showInfo = System.currentTimeMillis() < hideAt || !player.isPlaying
             delay(500)
         }
@@ -70,6 +79,15 @@ fun PlayerScreen(vm: AppViewModel) {
     fun seek(delta: Long) {
         val target = (player.currentPosition + delta).coerceAtLeast(0)
         player.seekTo(if (player.duration > 0) target.coerceAtMost(player.duration) else target)
+        flash = when {
+            delta <= -60_000 -> "b60"; delta < 0 -> "b10"; delta >= 60_000 -> "f60"; else -> "f10"
+        }
+        poke()
+    }
+    fun togglePlay() {
+        player.playWhenReady = !player.playWhenReady
+        playing = player.playWhenReady
+        flash = "pp"
         poke()
     }
 
@@ -110,23 +128,20 @@ fun PlayerScreen(vm: AppViewModel) {
                 onOk = {
                     if (showOptions) {
                         options.getOrNull(oSel)?.action?.invoke()
-                    } else {
-                        player.playWhenReady = !player.playWhenReady
-                        poke()
-                    }
+                    } else togglePlay()
                 },
                 onLongOk = { if (!showOptions) openOptions() },
                 onMenu = { if (showOptions) showOptions = false else openOptions(); true },
                 onChannelUp = { seek(30_000); true },
                 onChannelDown = { seek(-30_000); true },
-                onPlayPause = { player.playWhenReady = !player.playWhenReady; poke(); true }
+                onPlayPause = { togglePlay(); true }
             )
             .touchGestures(
                 // Dokun: bilgi bandi gizliyse goster, gorunuyorsa duraklat/oynat
                 onTap = {
                     if (showOptions) showOptions = false
                     else if (!showInfo) poke()
-                    else { player.playWhenReady = !player.playWhenReady; poke() }
+                    else togglePlay()
                 },
                 onLongPress = { if (!showOptions) openOptions() },
                 // Cift dokun: sol taraf 10 sn geri, sag taraf 10 sn ileri
@@ -142,6 +157,15 @@ fun PlayerScreen(vm: AppViewModel) {
         if (vm.buffering) CircularProgressIndicator(Modifier.align(Alignment.Center), color = Accent)
         vm.playerMessage?.let {
             Text(it, color = Color.White, fontSize = 22.sp, modifier = Modifier.align(Alignment.Center))
+        }
+        // Duraklatilinca ortada buyuk isaret
+        if (!playing && !showOptions) {
+            Text(
+                "⏸", color = Color.White, fontSize = 72.sp,
+                modifier = Modifier.align(Alignment.Center)
+                    .background(Color(0x88000000), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 28.dp, vertical = 8.dp)
+            )
         }
         if (showInfo) {
             Column(
@@ -160,8 +184,19 @@ fun PlayerScreen(vm: AppViewModel) {
                     )
                     Text("${fmt(pos)} / ${fmt(dur)}", color = Color(0xFF94A3B8), fontSize = 14.sp)
                 }
+                // Oynatma dugmeleri: kumandada ▼ ◀ OK ▶ ▲ tuslarina karsilik gelir, dokunarak da kullanilir
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
+                ) {
+                    CtrlChip("⏪ 1 dk", "▼", flash == "b60") { seek(-60_000) }
+                    CtrlChip("◀◀ 10 sn", "◀", flash == "b10") { seek(-10_000) }
+                    CtrlChip(if (playing) "⏸ Duraklat" else "▶ Oynat", "OK", flash == "pp") { togglePlay() }
+                    CtrlChip("10 sn ▶▶", "▶", flash == "f10") { seek(10_000) }
+                    CtrlChip("1 dk ⏩", "▲", flash == "f60") { seek(60_000) }
+                }
                 Text(
-                    "OK / dokun: Duraklat · ◀▶ / çift dokun: 10 sn · ▲▼: 1 dk · Uzun OK / basılı tut: Ses·Altyazı · Geri: Çık",
+                    "Uzun OK / basılı tut: Ses · Altyazı · Görüntü oranı · Geri: Çık",
                     color = Color(0xFF94A3B8), fontSize = 13.sp
                 )
             }
@@ -172,5 +207,20 @@ fun PlayerScreen(vm: AppViewModel) {
                 onClick = { i -> optIdx = i; options.getOrNull(i)?.action?.invoke() }
             )
         }
+    }
+}
+
+/** Oynatma dugmesi: odak almaz (kumanda tuslari ekran genelinde calisir); dokunarak da kullanilir. */
+@Composable
+private fun CtrlChip(text: String, key: String, lit: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text, color = if (lit) Color.Black else Color.White, fontSize = 17.sp,
+            modifier = Modifier
+                .background(if (lit) Accent else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                .pointerInput(Unit) { detectTapGestures { onClick() } }
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        )
+        Text(key, color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
     }
 }

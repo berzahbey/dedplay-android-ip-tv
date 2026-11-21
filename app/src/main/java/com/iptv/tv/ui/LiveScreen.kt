@@ -86,7 +86,18 @@ fun LiveScreen(vm: AppViewModel) {
     val channels = vm.itemsIn("live", vm.liveGroup)
     val gSel = groupIdx.coerceIn(0, (groups.size - 1).coerceAtLeast(0))
     val cSel = chanIdx.coerceIn(0, (channels.size - 1).coerceAtLeast(0))
-    val options = playerOptions(vm, live = true, onEpg = { epgIdx = 0; panel = Panel.EPG })
+    var srcIdx by remember { mutableIntStateOf(0) }
+    val options = playerOptions(
+        vm, live = true,
+        onEpg = { epgIdx = 0; panel = Panel.EPG },
+        onSources = { srcIdx = vm.sources.indexOfFirst { it.id == vm.activeId }.coerceAtLeast(0); panel = Panel.SOURCES }
+    )
+    val srcSel = srcIdx.coerceIn(0, (vm.sources.size - 1).coerceAtLeast(0))
+    fun pickSource(i: Int) {
+        val src = vm.sources.getOrNull(i) ?: return
+        panel = Panel.NONE
+        if (src.id != vm.activeId) { vm.setActive(src.id); vm.toast("Kaynak: ${src.name}") }
+    }
     val oSel = optIdx.coerceIn(0, (options.size - 1).coerceAtLeast(0))
     val nowMs = System.currentTimeMillis()
     val epgList = vm.epg[vm.currentChannel?.id ?: ""].orEmpty().filter { it.end > nowMs }
@@ -179,13 +190,13 @@ fun LiveScreen(vm: AppViewModel) {
         }
     }
 
-    LaunchedEffect(panel, touchTick, chanIdx, groupIdx, menuIdx, optIdx, epgIdx) {
+    LaunchedEffect(panel, touchTick, chanIdx, groupIdx, menuIdx, optIdx, epgIdx, srcIdx) {
         // Islem yoksa listeler kendiliginden kapanir (her tus / dokunma sureyi bastan baslatir).
         // TV'de kumandayla gezinmeye biraz daha zaman: 7 sn; dokunmatikte 5 sn.
         when (panel) {
             Panel.CHANNELS, Panel.GROUPS, Panel.MENU -> { delay(if (isTv) 7000 else 5000); panel = Panel.NONE }
             // Sagdaki secenekler / yayin akisi: okumaya zaman kalsin diye 8 sn
-            Panel.OPTIONS, Panel.EPG -> { delay(8000); panel = Panel.NONE }
+            Panel.OPTIONS, Panel.EPG, Panel.SOURCES -> { delay(8000); panel = Panel.NONE }
             else -> {}
         }
     }
@@ -212,6 +223,7 @@ fun LiveScreen(vm: AppViewModel) {
                         Panel.CHANNELS -> chanIdx = (cSel - 1).coerceAtLeast(0)
                         Panel.OPTIONS -> optIdx = (oSel - 1).coerceAtLeast(0)
                         Panel.EPG -> epgIdx = (eSel - 1).coerceAtLeast(0)
+                        Panel.SOURCES -> srcIdx = (srcSel - 1).coerceAtLeast(0)
                     }
                     true
                 },
@@ -223,6 +235,7 @@ fun LiveScreen(vm: AppViewModel) {
                         Panel.CHANNELS -> chanIdx = (cSel + 1).coerceAtMost((channels.size - 1).coerceAtLeast(0))
                         Panel.OPTIONS -> optIdx = (oSel + 1).coerceAtMost((options.size - 1).coerceAtLeast(0))
                         Panel.EPG -> epgIdx = (eSel + 1).coerceAtMost((epgList.size - 1).coerceAtLeast(0))
+                        Panel.SOURCES -> srcIdx = (srcSel + 1).coerceAtMost((vm.sources.size - 1).coerceAtLeast(0))
                     }
                     true
                 },
@@ -235,7 +248,7 @@ fun LiveScreen(vm: AppViewModel) {
                         Panel.GROUPS -> { menuIdx = 0; panel = Panel.MENU }
                         Panel.MENU -> {}
                         Panel.OPTIONS -> panel = Panel.NONE
-                        Panel.EPG -> panel = Panel.OPTIONS
+                        Panel.EPG, Panel.SOURCES -> panel = Panel.OPTIONS
                     }
                     true
                 },
@@ -245,7 +258,7 @@ fun LiveScreen(vm: AppViewModel) {
                         Panel.CHANNELS -> panel = Panel.NONE
                         Panel.GROUPS -> openChannels()
                         Panel.MENU -> openGroups()
-                        Panel.OPTIONS, Panel.EPG -> {}
+                        Panel.OPTIONS, Panel.EPG, Panel.SOURCES -> {}
                     }
                     true
                 },
@@ -260,6 +273,7 @@ fun LiveScreen(vm: AppViewModel) {
                         }
                         Panel.OPTIONS -> optionAt(oSel)
                         Panel.EPG -> epgAt(eSel)
+                        Panel.SOURCES -> pickSource(srcSel)
                     }
                 },
                 onLongOk = {
@@ -281,7 +295,7 @@ fun LiveScreen(vm: AppViewModel) {
                             val added = vm.toggleFavorite(it)
                             vm.toast(if (added) "★ Favorilere eklendi: ${it.name}" else "Favorilerden çıkarıldı: ${it.name}")
                         }
-                        Panel.MENU, Panel.OPTIONS, Panel.EPG -> {}
+                        Panel.MENU, Panel.OPTIONS, Panel.EPG, Panel.SOURCES -> {}
                     }
                 },
                 onChannelUp = { vm.zap(1); true },
@@ -293,7 +307,7 @@ fun LiveScreen(vm: AppViewModel) {
                     } else false
                 },
                 onMenu = {
-                    if (panel == Panel.OPTIONS || panel == Panel.EPG) panel = Panel.NONE else openOptions()
+                    if (panel == Panel.OPTIONS || panel == Panel.EPG || panel == Panel.SOURCES) panel = Panel.NONE else openOptions()
                     true
                 },
                 onLastChannel = { vm.goPrevious(); true },
@@ -330,8 +344,9 @@ fun LiveScreen(vm: AppViewModel) {
     ) {
         // Doldur / Uzat: TextureView (her cihazda olcege uyar; TV'lerde SurfaceView bunu yok sayabiliyor).
         // Sigdir: SurfaceView (daha verimli). Yuzey turu degisince gorunum yeniden kurulur.
-        val scaled = vm.resizeMode != 0
-        key(scaled) { PlayerSurface(vm.player, vm.resizeMode, clipToTile = scaled) }
+        // TV'de canli yayinda TextureView siyah ekran / donma yapti: TV'de her zaman SurfaceView
+        val scaled = vm.resizeMode != 0 && !isTv
+        key(scaled) { PlayerSurface(vm.player, if (isTv && vm.resizeMode == 3) 0 else vm.resizeMode, clipToTile = scaled) }
 
         if (vm.buffering) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Accent)
@@ -505,6 +520,15 @@ fun LiveScreen(vm: AppViewModel) {
                     onClick = { i -> epgAt(i) }
                 )
             }
+            Panel.SOURCES -> OptionsPanel(
+                vm.sources.map { src ->
+                    OptionItem(ListRow(src.name, sub = src.type.uppercase(), badge = if (src.id == vm.activeId) "▶" else "")) {}
+                },
+                srcSel,
+                "OK / dokun: Seç · ◀: Geri",
+                title = "KAYNAK SEÇ",
+                onClick = { i -> srcIdx = i; pickSource(i) }
+            )
             Panel.OPTIONS -> OptionsPanel(
                 options, oSel,
                 "OK: Değiştir · ◀ / Geri: Kapat",

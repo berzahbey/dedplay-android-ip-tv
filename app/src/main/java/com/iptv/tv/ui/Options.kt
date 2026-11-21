@@ -43,10 +43,13 @@ class OptionItem(val row: ListRow, val closes: Boolean = false, val action: () -
  * Oynatma sirasinda Menu tusuyla (veya menuden) acilan secenekler.
  * live = true ise canli TV'ye ozel "Onceki kanal" satiri da eklenir.
  */
-fun playerOptions(vm: AppViewModel, live: Boolean, onEpg: () -> Unit = {}): List<OptionItem> {
+fun playerOptions(vm: AppViewModel, live: Boolean, onEpg: () -> Unit = {}, onSources: () -> Unit = {}): List<OptionItem> {
     val list = ArrayList<OptionItem>()
     if (live) {
         list.add(OptionItem(ListRow("Önceki kanala dön", sub = vm.previousChannel?.name ?: "-"), closes = true) { vm.goPrevious() })
+        if (vm.sources.size > 1) {
+            list.add(OptionItem(ListRow("Kaynak (liste) değiştir", sub = vm.activeSource()?.name ?: "-")) { onSources() })
+        }
     }
     list.add(OptionItem(ListRow("Ses", sub = vm.trackSummary(C.TRACK_TYPE_AUDIO))) { vm.cycleTrack(C.TRACK_TYPE_AUDIO) })
     list.add(OptionItem(ListRow("Altyazı", sub = vm.trackSummary(C.TRACK_TYPE_TEXT))) { vm.cycleTrack(C.TRACK_TYPE_TEXT) })

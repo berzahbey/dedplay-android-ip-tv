@@ -60,7 +60,7 @@ data class TrackOption(val label: String, val groupIndex: Int, val trackIndex: I
 enum class Screen { LIVE, MOVIES, SERIES, SETTINGS, MANAGE_GROUPS, ADD_SOURCE, PLAYER, SEARCH, RECORDINGS, MULTI }
 
 /** Canli TV uzerindeki kumanda panelleri. */
-enum class Panel { NONE, MENU, GROUPS, CHANNELS, OPTIONS, EPG }
+enum class Panel { NONE, MENU, GROUPS, CHANNELS, OPTIONS, EPG, SOURCES }
 
 const val FAV_GROUP = "★ Favoriler"
 /** Favorilerin altinda: gizli gruplar haric tum canli kanallar. */
@@ -73,7 +73,7 @@ val REFRESH_LABELS = listOf("Her açılışta", "Günde bir", "3 günde bir", "H
 private const val DAY_MS = 24L * 3600 * 1000
 val REFRESH_MS = listOf(0L, DAY_MS, 3 * DAY_MS, 7 * DAY_MS, -1L)
 
-val RESIZE_LABELS = listOf("Sığdır", "Doldur (kırp)", "Uzat")
+val RESIZE_LABELS = listOf("Sığdır", "Doldur (kırp)", "Uzat", "Yakınlaştır (siyah bantları kaldır)")
 val BUFFER_LABELS = listOf("Düşük (hızlı açılış)", "Normal", "Yüksek (az takılma)")
 val START_LABELS = listOf("Favorilerdeki ilk kanal", "Son izlenen kanal")
 val BACK_LABELS = listOf("İki kez Geri ile çık", "Çıkmaz (sadece Home)")
