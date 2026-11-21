@@ -1,6 +1,15 @@
 package com.iptv.tv.ui
 
 import androidx.activity.compose.BackHandler
+import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.DisposableEffect
+import android.view.WindowManager
+import android.provider.Settings
+import android.media.AudioManager
+import android.content.Context
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -98,6 +107,9 @@ fun PlayerScreen(vm: AppViewModel) {
     // Secenek listesi islem yoksa kendiliginden kapanir, film devam eder
     // (her tus / dokunma sureyi bastan baslatir): TV'de 7 sn, dokunmatikte 8 sn
     val isTv = rememberIsTv()
+
+    // Dokunmatik: sag yarida yukari/asagi kaydir = ses, sol yarida = parlaklik (yukari artirir)
+    val adjust = remember { AdjustState() }
     var touchTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(showOptions, optIdx, touchTick) {
         if (showOptions) { delay(if (isTv) 7000 else 8000); showOptions = false }
@@ -147,6 +159,8 @@ fun PlayerScreen(vm: AppViewModel) {
                 // Cift dokun: sol taraf 10 sn geri, sag taraf 10 sn ileri
                 onDoubleTap = { x -> if (!showOptions) seek(if (x < 0.5f) -10_000 else 10_000) }
             )
+            // touchGestures'tan SONRA: dikey kaydirmayi once bu yakalar
+            .swipeVolumeBrightness(enabled = !isTv, state = adjust)
             .focusRequester(fr)
             .focusable()
     ) {
@@ -158,6 +172,8 @@ fun PlayerScreen(vm: AppViewModel) {
         vm.playerMessage?.let {
             Text(it, color = Color.White, fontSize = 22.sp, modifier = Modifier.align(Alignment.Center))
         }
+        // Ses / parlaklik gostergesi
+        BoxScopeAdjustOverlay(adjust, Modifier.align(Alignment.Center))
         // Duraklatilinca ortada buyuk isaret
         if (!playing && !showOptions) {
             Text(

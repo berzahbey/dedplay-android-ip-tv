@@ -482,3 +482,84 @@ fun RegisterKeyFocus(fr: FocusRequester) {
         onDispose { if (KeyFocus.current === fr) KeyFocus.current = null }
     }
 }
+
+/** Ses / parlaklik kaydirma gostergesinin durumu ("🔊 60%"; bossa gizli). */
+class AdjustState {
+    var label by mutableStateOf("")
+    var tick by mutableIntStateOf(0)
+}
+
+/**
+ * Dokunmatik: ekranin sag yarisinda yukari/asagi kaydir = ses, sol yarisinda = parlaklik
+ * (yukari artirir). Ekrandan cikinca parlaklik sistem ayarina doner. TV'de kapali.
+ * Modifier zincirinde touchGestures'tan SONRA eklenmeli (dikey kaydirmayi once bu yakalar).
+ */
+@Composable
+fun Modifier.swipeVolumeBrightness(enabled: Boolean, state: AdjustState): Modifier {
+    val ctx = LocalContext.current
+    val audio = remember { ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager }
+    val window = (ctx as? android.app.Activity)?.window
+    LaunchedEffect(state.tick) { if (state.label.isNotEmpty()) { kotlinx.coroutines.delay(1200); state.label = "" } }
+    DisposableEffect(Unit) {
+        onDispose {
+            window?.let { w ->
+                val lp = w.attributes
+                lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                w.attributes = lp
+            }
+        }
+    }
+    if (!enabled) return this
+    return this.pointerInput(Unit) {
+        var right = true
+        var acc = 0f
+        var startVol = 0
+        var startBright = 0.5f
+        detectVerticalDragGestures(
+            onDragStart = { off ->
+                right = off.x > size.width / 2f
+                acc = 0f
+                startVol = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                val b = window?.attributes?.screenBrightness ?: -1f
+                startBright = if (b >= 0f) b else {
+                    val sys = runCatching {
+                        android.provider.Settings.System.getInt(ctx.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS)
+                    }.getOrDefault(128)
+                    (sys / 255f).coerceIn(0.01f, 1f)
+                }
+            },
+            onVerticalDrag = { change, dy ->
+                change.consume()
+                acc -= dy
+                val frac = acc / (size.height * 0.8f)
+                if (right) {
+                    val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                    val v = (startVol + frac * max).toInt().coerceIn(0, max)
+                    audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v, 0)
+                    state.label = "🔊 ${v * 100 / max}%"
+                } else {
+                    val b = (startBright + frac).coerceIn(0.01f, 1f)
+                    window?.let { w ->
+                        val lp = w.attributes
+                        lp.screenBrightness = b
+                        w.attributes = lp
+                    }
+                    state.label = "☀ ${(b * 100).toInt()}%"
+                }
+                state.tick++
+            }
+        )
+    }
+}
+
+/** Ekranin ortasinda ses / parlaklik gostergesi. */
+@Composable
+fun BoxScopeAdjustOverlay(state: AdjustState, modifier: Modifier) {
+    if (state.label.isEmpty()) return
+    Text(
+        state.label, color = Color.White, fontSize = 34.sp,
+        modifier = modifier
+            .background(Color(0xAA000000), RoundedCornerShape(14.dp))
+            .padding(horizontal = 24.dp, vertical = 10.dp)
+    )
+}
