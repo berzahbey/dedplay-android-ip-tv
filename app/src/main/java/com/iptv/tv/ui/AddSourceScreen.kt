@@ -88,10 +88,30 @@ fun AddSourceScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
+    /** Panodan Xtream: tam link (get.php / player_api.php ?username=&password=) ise uc alani doldurur. */
+    fun pasteXtream() {
+        val text = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString()?.trim()
+        if (text.isNullOrEmpty()) { status = "Pano boş"; return }
+        val uri = runCatching { Uri.parse(text) }.getOrNull()
+        val u = uri?.getQueryParameter("username")
+        val pw = uri?.getQueryParameter("password")
+        if (uri?.host != null && !u.isNullOrEmpty() && !pw.isNullOrEmpty()) {
+            val port = if (uri.port > 0) ":${uri.port}" else ""
+            host = "${uri.scheme ?: "http"}://${uri.host}$port"
+            user = u
+            pass = pw
+            status = "Xtream bilgileri linkten dolduruldu"
+        } else {
+            host = text
+            status = "Sunucu adresi yapıştırıldı"
+        }
+    }
+
     fun pasteUrl() {
         val clip = clipboard.primaryClip
         if (clip != null && clip.itemCount > 0) {
-            val text = clip.getItemAt(0).text
+            // coerceToText: link "URI" olarak kopyalandiysa da metne cevrilir
+            val text = clip.getItemAt(0).coerceToText(ctx)
             if (text != null && text.isNotBlank()) {
                 url = text.toString().trim()
                 status = "Link panodan yapıştırıldı"
@@ -224,10 +244,15 @@ fun AddSourceScreen(vm: AppViewModel) {
         OutlinedTextField(name, { name = it }, fm, label = { Text("Kaynak adı") }, singleLine = true,
             colors = colors, keyboardOptions = next, keyboardActions = nextAction)
         if (type == "m3u") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(url, { url = it }, fm, label = { Text("M3U linki (http://...)") }, singleLine = true,
+            // Metin kutusu kalan genisligi alir, "Yapistir" dugmesi dar ekranda (tablet / telefon) da gorunur
+            Row(
+                Modifier.fillMaxWidth().widthIn(max = 860.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                OutlinedTextField(url, { url = it }, Modifier.weight(1f), label = { Text("M3U linki (http://...)") }, singleLine = true,
                     colors = colors, keyboardOptions = next, keyboardActions = nextAction)
-                TvButton("Yapıştır", modifier = Modifier.widthIn(min = 110.dp), compact = true) { pasteUrl() }
+                TvButton("Yapıştır", compact = true) { pasteUrl() }
             }
         } else if (type == "m3ufile") {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -240,8 +265,19 @@ fun AddSourceScreen(vm: AppViewModel) {
                 color = Color(0xFF94A3B8), fontSize = 15.sp
             )
         } else {
-            OutlinedTextField(host, { host = it }, fm, label = { Text("Sunucu (örn: http://sunucu.com:8080)") },
-                singleLine = true, colors = colors, keyboardOptions = next, keyboardActions = nextAction)
+            Row(
+                Modifier.fillMaxWidth().widthIn(max = 860.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                OutlinedTextField(host, { host = it }, Modifier.weight(1f), label = { Text("Sunucu (örn: http://sunucu.com:8080)") },
+                    singleLine = true, colors = colors, keyboardOptions = next, keyboardActions = nextAction)
+                TvButton("Yapıştır", compact = true) { pasteXtream() }
+            }
+            Text(
+                "İpucu: sağlayıcının verdiği get.php?username=…&password=… linkini yapıştırırsanız alanlar kendiliğinden dolar.",
+                color = Color(0xFF94A3B8), fontSize = 13.sp, modifier = Modifier.widthIn(max = 860.dp)
+            )
             OutlinedTextField(user, { user = it }, fm, label = { Text("Kullanıcı adı") }, singleLine = true,
                 colors = colors, keyboardOptions = next, keyboardActions = nextAction)
             OutlinedTextField(pass, { pass = it }, fm, label = { Text("Şifre") }, singleLine = true,
